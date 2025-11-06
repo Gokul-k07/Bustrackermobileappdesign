@@ -184,9 +184,9 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
         zoomControl: false
       }).setView([currentLocation.lat, currentLocation.lng], 13);
 
-      // Add dark MapTiler tile layer
+      // Add light MapTiler tile layer (white/light theme)
       const API_KEY = "3rn9Pt2DDS2PIVE5bwGb";
-      L.tileLayer(`https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=${API_KEY}`, {
+      L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${API_KEY}`, {
         attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">© MapTiler</a>',
         maxZoom: 18,
         noWrap: false,
@@ -196,6 +196,24 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
       L.control.zoom({
         position: 'topright'
       }).addTo(mapInstance.current);
+      
+      // Add button to center on user location
+      const centerControl = L.Control.extend({
+        onAdd: function() {
+          const btn = L.DomUtil.create('button');
+          btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>';
+          btn.title = 'Center on my location';
+          btn.style.cssText = 'background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4);';
+          
+          btn.onclick = function() {
+            mapInstance.current.setView([currentLocation.lat, currentLocation.lng], 15);
+          };
+          
+          return btn;
+        }
+      });
+      
+      new centerControl({ position: 'topright' }).addTo(mapInstance.current);
     }
   }, [mapLoaded, currentLocation]);
 

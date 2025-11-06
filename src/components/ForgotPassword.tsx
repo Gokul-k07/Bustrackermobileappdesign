@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -20,6 +20,8 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [expiryTime, setExpiryTime] = useState<Date | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const handleSendCode = async () => {
     if (!email.trim()) {
@@ -27,7 +29,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
       return;
     }
 
-    const loadingToast = toast.loading('Sending verification code...');
+    setIsSending(true);
 
     try {
       const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/send-reset-code`, {
@@ -37,7 +39,6 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
       });
 
       const data = await response.json();
-      toast.dismiss(loadingToast);
       
       if (response.ok) {
         const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
@@ -53,8 +54,9 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
         });
       }
     } catch (error) {
-      toast.dismiss(loadingToast);
       toast.error('Failed to send verification code');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -93,7 +95,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
       return;
     }
 
-    const loadingToast = toast.loading('Resetting password...');
+    setIsResetting(true);
 
     try {
       const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/reset-password`, {
@@ -103,7 +105,6 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
       });
 
       const data = await response.json();
-      toast.dismiss(loadingToast);
 
       if (response.ok) {
         toast.success('Password reset successfully!', {
@@ -116,8 +117,9 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
         toast.error(data.error || 'Failed to reset password');
       }
     } catch (error) {
-      toast.dismiss(loadingToast);
       toast.error('Failed to reset password');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -160,8 +162,15 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
                 />
               </div>
 
-              <Button onClick={handleSendCode} className="w-full">
-                Send Verification Code
+              <Button onClick={handleSendCode} className="w-full" disabled={isSending}>
+                {isSending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending Code...
+                  </>
+                ) : (
+                  'Send Verification Code'
+                )}
               </Button>
             </>
           )}
@@ -263,9 +272,16 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
               <Button
                 onClick={handleResetPassword}
                 className="w-full"
-                disabled={!newPassword || !confirmPassword}
+                disabled={!newPassword || !confirmPassword || isResetting}
               >
-                Reset Password
+                {isResetting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Resetting Password...
+                  </>
+                ) : (
+                  'Reset Password'
+                )}
               </Button>
             </>
           )}

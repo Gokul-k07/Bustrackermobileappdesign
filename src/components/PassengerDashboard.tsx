@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner@2.0.3';
 import { BusLocation } from '../App';
 
@@ -101,6 +101,9 @@ export function PassengerDashboard({
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Get More Coins</DialogTitle>
+                    <DialogDescription>
+                      Purchase coin packages to share your location with drivers.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3">
                     <Card className="cursor-pointer hover:bg-muted/50" onClick={() => buyCoinPackage(50, '$2.99')}>
@@ -212,13 +215,11 @@ export function PassengerDashboard({
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Share Your Location</DialogTitle>
+                    <DialogDescription>
+                      Get a 5-hour valid OTP from the driver, select your bus, and share your location.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        Get a 5-hour valid OTP from the driver, select your bus, and share your location
-                      </p>
-                    </div>
                     <div>
                       <Label htmlFor="otp">Enter OTP Code (Valid for 5 hours)</Label>
                       <Input

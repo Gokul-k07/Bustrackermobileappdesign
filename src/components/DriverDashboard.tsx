@@ -3,7 +3,7 @@ import { Play, Square, QrCode, Users, MapPin, Clock, Copy, Bus, Plus } from 'luc
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -185,6 +185,9 @@ export function DriverDashboard({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Active OTPs</DialogTitle>
+                  <DialogDescription>
+                    View and manage all active OTP codes for passenger location sharing.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                   {activeOTPs.length === 0 ? (
@@ -318,6 +321,9 @@ export function DriverDashboard({
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>All Active Users</DialogTitle>
+                      <DialogDescription>
+                        List of all passengers currently sharing their location with you.
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {locationShares.map((share) => (
@@ -355,6 +361,9 @@ export function DriverDashboard({
               <Bus className="h-5 w-5" />
               Select Your Bus
             </DialogTitle>
+            <DialogDescription>
+              Choose the bus you'll be driving to start your trip.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {!showAddNewBus ? (

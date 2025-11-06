@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send } from 'lucide-react';
+import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send, Loader2 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Badge } from './components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
 import { Textarea } from './components/ui/textarea';
 import { Label } from './components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
@@ -163,69 +163,76 @@ export default function App() {
 
   const requestLocationPermission = () => {
     if ("geolocation" in navigator) {
-      // Show toast asking for permission
-      toast.info('Location Permission Required', {
-        description: 'Please allow location access to see your current position on the map and share your location with drivers',
-        duration: 5000
-      });
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setCurrentLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+            setLocationPermissionGranted(true);
+            
+            // Set up location tracking for continuous updates
+            const watchId = navigator.geolocation.watchPosition(
+              (position) => {
+                setCurrentLocation({
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                });
+              },
+              (error) => {
+                console.warn('Location tracking error:', error);
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+              }
+            );
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setLocationPermissionGranted(true);
-          toast.success('Location permission granted!', {
-            description: 'Your current location is now visible on the map'
-          });
-          
-          // Set up location tracking for continuous updates
-          const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-              setCurrentLocation({
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
+            return () => {
+              navigator.geolocation.clearWatch(watchId);
+            };
+          },
+          (error) => {
+            console.warn('Geolocation error:', error.message || error.code);
+            setLocationPermissionGranted(false);
+            
+            // Only show toast when permission is actually denied or unavailable
+            if (error.message && error.message.includes('permissions policy')) {
+              toast.warning('Location access restricted', {
+                description: 'Location has been disabled by your browser or site settings. Using default location.',
+                duration: 5000
               });
-            },
-            (error) => {
-              console.warn('Location tracking error:', error);
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 60000
+            } else if (error.code === 1) { // PERMISSION_DENIED
+              toast.info('Location Permission Required', {
+                description: 'Please allow location access to see your current position on the map and share your location with drivers',
+                duration: 5000
+              });
+            } else if (error.code === 2) { // POSITION_UNAVAILABLE
+              toast.warning('Location unavailable', {
+                description: 'Unable to determine your location. Using default location.'
+              });
+            } else if (error.code === 3) { // TIMEOUT
+              toast.warning('Location request timed out', {
+                description: 'Please check your device location settings'
+              });
             }
-          );
-
-          return () => {
-            navigator.geolocation.clearWatch(watchId);
-          };
-        },
-        (error) => {
-          console.warn('Geolocation error:', error.message || error.code);
-          setLocationPermissionGranted(false);
-          
-          if (error.code === 1) { // PERMISSION_DENIED
-            toast.error('Location permission denied', {
-              description: 'You can enable it later in your browser settings or device location settings to use location features'
-            });
-          } else if (error.code === 2) { // POSITION_UNAVAILABLE
-            toast.warning('Location unavailable', {
-              description: 'Unable to determine your location. Using default location.'
-            });
-          } else if (error.code === 3) { // TIMEOUT
-            toast.warning('Location request timed out', {
-              description: 'Please check your device location settings'
-            });
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000
           }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        }
-      );
+        );
+      } catch (err: any) {
+        console.warn('Geolocation initialization error:', err);
+        setLocationPermissionGranted(false);
+        toast.warning('Location access restricted', {
+          description: 'Location services are not available. Using default location.',
+          duration: 5000
+        });
+      }
     } else {
       toast.info('Geolocation not supported', {
         description: 'Your browser or device does not support location services. Using default location.'
@@ -407,8 +414,6 @@ export default function App() {
   };
 
   const handleCompleteOnboarding = async (userData: { name: string; email: string; password: string; role: UserRole }) => {
-    const loadingToast = toast.loading('Signing up...');
-    
     try {
       // Register user
       const registerData = await apiClient.register(userData);
@@ -420,9 +425,7 @@ export default function App() {
       });
 
       if (error) {
-        toast.dismiss(loadingToast);
-        toast.error('Failed to sign in after registration');
-        return;
+        throw new Error('Failed to sign in after registration');
       }
 
       setSession(signInData.session);
@@ -433,26 +436,20 @@ export default function App() {
       setUser(profileData.user);
       setCurrentScreen('main');
       
-      toast.dismiss(loadingToast);
       toast.success('Account created successfully!');
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.dismiss(loadingToast);
       
       // Check for duplicate email error
       if (error.message && (error.message.includes('already') || error.message.includes('exists'))) {
-        toast.error('Email already registered', {
-          description: 'You can use another email or click "Forgot password" to reset your password'
-        });
+        throw new Error('Email already registered');
       } else {
-        toast.error(error.message || 'Failed to create account');
+        throw new Error(error.message || 'Failed to create account');
       }
     }
   };
 
   const handleSignIn = async (email: string, password: string) => {
-    const loadingToast = toast.loading('Signing in...');
-    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -460,9 +457,7 @@ export default function App() {
       });
 
       if (error) {
-        toast.dismiss(loadingToast);
-        toast.error(error.message || 'Invalid email or password');
-        return;
+        throw new Error('Invalid email or password');
       }
 
       setSession(data.session);
@@ -472,17 +467,17 @@ export default function App() {
       setUser(profileData.user);
       setCurrentScreen('main');
       
-      toast.dismiss(loadingToast);
       toast.success('Signed in successfully!');
     } catch (error: any) {
       console.error('Sign in error:', error);
-      toast.dismiss(loadingToast);
-      toast.error('Failed to sign in');
+      throw new Error(error.message || 'Invalid email or password');
     }
   };
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
   const handleSignOut = async () => {
-    const loadingToast = toast.loading('Signing out...');
+    setIsSigningOut(true);
     
     try {
       await supabase.auth.signOut();
@@ -491,12 +486,12 @@ export default function App() {
       apiClient.setAccessToken(null);
       setCurrentScreen('onboarding');
       
-      toast.dismiss(loadingToast);
       toast.success('Signed out successfully');
     } catch (error) {
       console.error('Sign out error:', error);
-      toast.dismiss(loadingToast);
       toast.error('Failed to sign out');
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -809,13 +804,11 @@ export default function App() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Send Feedback</DialogTitle>
+                        <DialogDescription>
+                          Help us improve BusTracker! Share your feedback, report errors, or suggest new features.
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            Help us improve BusTracker! Share your feedback, report errors, or suggest new features.
-                          </p>
-                        </div>
                         
                         <div>
                           <Label htmlFor="feedbackType">Feedback Type</Label>
@@ -857,8 +850,20 @@ export default function App() {
                     </DialogContent>
                   </Dialog>
 
-                  <Button onClick={handleSignOut} variant="outline" className="w-full">
-                    Sign Out
+                  <Button 
+                    onClick={handleSignOut} 
+                    variant="outline" 
+                    className="w-full"
+                    disabled={isSigningOut}
+                  >
+                    {isSigningOut ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing Out...
+                      </>
+                    ) : (
+                      'Sign Out'
+                    )}
                   </Button>
                 </CardContent>
               </Card>

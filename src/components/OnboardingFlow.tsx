@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bus, MapPin, Shield, ChevronRight, LogIn } from 'lucide-react';
+import { Bus, MapPin, Shield, ChevronRight, LogIn, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -8,14 +8,16 @@ import { UserRole } from '../App';
 import { ForgotPassword } from './ForgotPassword';
 
 interface OnboardingFlowProps {
-  onComplete: (user: { name: string; email: string; password: string; role: UserRole }) => void;
-  onSignIn: (email: string, password: string) => void;
+  onComplete: (user: { name: string; email: string; password: string; role: UserRole }) => Promise<void>;
+  onSignIn: (email: string, password: string) => Promise<void>;
 }
 
 export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSignUp, setIsSignUp] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -50,15 +52,24 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
     }
   };
 
-  const handleSubmit = () => {
-    if (isSignUp) {
-      if (formData.name.trim() && formData.email.trim() && formData.password.trim()) {
-        onComplete(formData);
+  const handleSubmit = async () => {
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      if (isSignUp) {
+        if (formData.name.trim() && formData.email.trim() && formData.password.trim()) {
+          await onComplete(formData);
+        }
+      } else {
+        if (formData.email.trim() && formData.password.trim()) {
+          await onSignIn(formData.email, formData.password);
+        }
       }
-    } else {
-      if (formData.email.trim() && formData.password.trim()) {
-        onSignIn(formData.email, formData.password);
-      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -93,7 +104,10 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
                   type="text"
                   placeholder="Enter your full name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setError('');
+                  }}
                   className="mt-1"
                 />
               </div>
@@ -106,9 +120,15 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
                 type="email"
                 placeholder="Enter your email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  setError('');
+                }}
                 className="mt-1"
               />
+              {isSignUp && error && error.toLowerCase().includes('email') && (
+                <p className="text-sm text-red-500 mt-1">{error}</p>
+              )}
             </div>
             
             <div>
@@ -118,7 +138,10 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
                 type="password"
                 placeholder="Enter your password"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  setError('');
+                }}
                 className="mt-1"
               />
               {!isSignUp && (
@@ -157,24 +180,44 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
               </div>
             )}
             
+            {!isSignUp && error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+            
             <Button 
               onClick={handleSubmit}
               className="w-full"
               disabled={
-                isSignUp 
+                isLoading ||
+                (isSignUp 
                   ? !formData.name.trim() || !formData.email.trim() || !formData.password.trim()
-                  : !formData.email.trim() || !formData.password.trim()
+                  : !formData.email.trim() || !formData.password.trim())
               }
             >
-              {isSignUp ? 'Create Account' : 'Sign In'}
-              <ChevronRight className="ml-2 h-4 w-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                </>
+              ) : (
+                <>
+                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </>
+              )}
             </Button>
             
             <div className="text-center">
               <Button
                 variant="ghost"
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError('');
+                }}
                 className="text-sm"
+                disabled={isLoading}
               >
                 {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
               </Button>
