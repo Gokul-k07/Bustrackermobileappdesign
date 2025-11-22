@@ -18,6 +18,7 @@ import { RoleSelection } from './components/RoleSelection';
 import { DriverDashboard } from './components/DriverDashboard';
 import { PassengerDashboard } from './components/PassengerDashboard';
 import { MapView } from './components/MapView';
+import { AIChat } from './components/AIChat';
 
 export type UserRole = 'driver' | 'passenger' | null;
 
@@ -107,6 +108,7 @@ export default function App() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
 
   // Check for existing session, restore state, and setup geolocation on mount
   useEffect(() => {
@@ -516,9 +518,16 @@ export default function App() {
       
       setIsLocationSharing(true);
       
+      // Immediately refresh bus locations to show the passenger as a bus
+      await loadBusLocations();
+      
       toast.success('Location sharing started!', {
-        description: 'Valid for 5 hours. You can now act as a driver!'
+        description: `Valid for 5 hours. You earned 10 coins! Your bus: ${busName}`
       });
+      
+      // Refresh user profile to get updated coin balance
+      const profileData = await apiClient.getProfile();
+      setUser(profileData.user);
       
       // Save state to localStorage for persistence
       localStorage.setItem('bustracker_sharing_state', JSON.stringify({
@@ -537,6 +546,10 @@ export default function App() {
       await apiClient.stopLocationSharing();
       setIsLocationSharing(false);
       localStorage.removeItem('bustracker_sharing_state');
+      
+      // Immediately refresh bus locations to remove the passenger from bus list
+      await loadBusLocations();
+      
       toast.info('Location sharing stopped');
     } catch (error: any) {
       console.error('Stop sharing error:', error);
@@ -717,7 +730,7 @@ export default function App() {
         </div>
 
         {/* Main Content */}
-        <div className="pb-20">
+        <div className="pb-32">
           {activeTab === 'home' && (
             <div className="p-4">
               {user.role === 'driver' ? (
@@ -871,8 +884,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Bottom Navigation */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t">
+        {/* AI Chat Component */}
+        <AIChat />
+
+        {/* Bottom Navigation - Always visible */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-30 shadow-lg">
           <div className="grid grid-cols-3 p-4">
             <Button 
               variant={activeTab === 'home' ? 'default' : 'ghost'} 

@@ -49,136 +49,48 @@ async function initializeDefaultBuses() {
 
 // Default bus routes configuration
 const DEFAULT_BUS_ROUTES = {
-  "PSNA-30": [
-    "MURUGABHAVANAM",
-    "AYYANGULAM",
-    "SAKTHI TALKIES",
-    "AARIYABHAVAN",
-    "VANI VILAS",
-    "JEGANATH HOSPITAL",
-    "SONA TOWER",
-    "AMMA MESS",
-    "12TH CROSS",
-    "9TH CROSS",
-    "8TH CROSS",
-    "7TH CROSS",
-    "WATER TANK",
-    "4TH CROSS",
-    "MVM COLLEGE",
-    "ANJALI BYE PASS",
-    "PSNACET"
-  ],
-  "PSNA-29": [
-    "BALAKRISHNAPURAM",
-    "SMBM SCHOOL",
-    "SP OFFICE",
-    "DGL SCAN",
-    "DGL BUS STAND",
-    "DGL G.H",
-    "AARIYABHAVAN",
-    "PALANI BYE.PASS",
-    "PSNACET"
-  ],
-  "PSNA-31/56": [
-    "KULLANAMPATTY",
-    "II RMTC",
-    "VIJAY THEATRE",
-    "NAGAL NAGAR",
-    "ANNAMALAYAR SCHOOL",
-    "BHARATH!PURAM",
-    "BHUVANESWARI AMMAN KOVIL",
-    "METTUPATTY",
-    "BEGAMBUR",
-    "PARAPATTI K",
-    "A.P NAGAR",
-    "PSNACET"
-  ],
-  "PSNA-36": [
-    "CHINNALAPATTY",
-    "POONCHOLAI",
-    "CHINNALAPATTY PIRIVU",
-    "KEELAKOTTAI BYE-PASS",
-    "CHETTIYAPATTY PIRIVU",
-    "KALIKAM PATTY PIRIVU",
-    "POKUVARATHU NAGAR",
-    "VELLODU PIRIVU",
-    "PANJAM PATTY PIRIVU (EAST)",
-    "COFFEE SHOP",
-    "ANNAMALAYAR MILL",
-    "THOMAYARPURAM",
-    "PSNACET"
-  ],
-  "PSNA-35": [
-    "SMBM SCHOOL",
-    "SP OFFICE",
-    "SP OFFICE",
-    "DGL BUS STAND",
-    "AARIYABHAVAN",
-    "VANI VILAS SIGNAL",
-    "PALANI BYE-PASS",
-    "PSNACET"
-  ],
-  "PSNA-32": [
-    "MA.MU.KOVILUR PIRIVU",
-    "SEELAPADI BYE.PASS",
-    "NGA MILL",
-    "NGO COLONY",
-    "UZAVAR SANTHAI",
-    "CITY HOSPITAL",
-    "PSNACET"
-  ],
-  "PSNA-69": [
-    "MA.MU.KOVILUR PIRIVU",
-    "POLICE QUARTERS",
-    "SEELAPADI BYE.PASS",
-    "OIL MILL",
-    "NIVIS MAHAL",
-    "CHETTINAICKEN PATTI PIRIVU",
-    "ANJALI BYE.PASS",
-    "PSNACET"
-  ],
-  "PSNA-73": [
-    "SMBM SCHOOL",
-    "MSP SCHOOL",
-    "AMMA MESS",
-    "12TH CROSS",
-    "9TH CROSS",
-    "7TH CROSS",
-    "WATER TANK",
-    "4TH CROSS",
-    "MVM COLLEGE",
-    "ANJALI BYE PASS",
-    "PSNACET"
-  ],
-  "PSNA-72": [
-    "DGL SCAN",
-    "DGL BUS STAND",
-    "DGL GH",
-    "AARIYABHAVAN",
-    "VANI VILAS SIGNAL",
-    "PALANI BYE.PASS",
-    "PSNACET"
-  ],
-  "PSNA-74": [
-    "PATTIVEERAN PATTY",
-    "ANNA NAGAR",
-    "SAVADI",
-    "RADIO POTTAL",
-    "GANDHI PURAM",
-    "THEVARAN PATTY PIRIVU",
-    "VEPPAMARAM",
-    "ARASAMARAM",
-    "GANESHAPURAM",
-    "AATHUR TALUK OFFICE",
-    "AATHUR BUS STAND",
-    "S PARAI PATTY",
-    "DHARUMATHUPATTY",
-    "KANNIVADI",
-    "AALATHURAN PATTY",
-    "PUDHUPATTY",
-    "REDDIYAR CHATRAM",
-    "PSNACET"
-  ]
+
+"PSNA-25": ["KOVILUR", "PUDHU ROAD", "ERIYODU", "THOTANAMPATTY", "NALAMANAKAR KOTTAI", "KULATHUR", "RVS COLLEGE", "GTN COLLEGE", "NS NAGAR", "THANEER PANTHAL", "PSNACET"],
+"PSNA-26": ["KALLIMANDAYAM", "P.K.VALASU", "AMBILIKKHAI HOSPITAL", "AMBILIKKAI", "BOY SALAI", "KOSAVAPATTI", "PATTALAMMAN KOVIL", "PNK KALYANA MANDAPAM", "O.D.C G.H", "E.B OFFICE", "KARTHIK THEATRE", "THUMMICHAMPATTI BYE-PASS", "KADAIVEETHI", "INDIAN THEATRE", "ODC BUS STAND", "NAGANAMPATTY PIRIVU", "RMTC DEPOT", "CHECK POST", "MOOLACHATRAM", "PALAKANOOTHU", "SEMMADAIPATTY", "REDDIARCHATRAM", "PSNACET"],
+"PSNA-27": ["VEDASANDUR BUS STAND", "ATHUMEDU", "KONGU NAGAR", "KALANAM PATTY", "VELAYUTHASAMY MILL", "KAKATOPPU", "LAKSHMANAPATTY", "EVARADY MILLS", "VITTALNAYAKKAN PATTI", "KARIYAMPATTY", "AGARAM", "THADIKOMPU", "KAMATCHIPURAM", "SENGULAM", "SARALAPPATTI", "COLLECTORATE", "PSNACET"],
+"PSNA-45": ["MADURA COLLEGE (MEGRA)", "ANDAL PURAM", "NATRAJ THEATRE", "FENNER", "KOCHADAI", "PSNACET"],
+"PSNA-47": ["KALAVASAL", "PP CHAVADI", "BELL HOTEL(FENNER)", "TVS", "HMS COLONY", "VIRATTIPATTHU/ATCHAMPATTHU", "MUDAKKUSALAI", "NAGAMALAI BY PASS", "THANICHTHAYAM PIRIVU", "AANDIPATTI BANGALA", "PSNACET"],
+"PSNA-38": ["BATALAGUNDU BUS STAND", "POLICE STATION", "KALIAMMAN KOVIL", "KATTASPATHIRI", "INDIAN OIL", "STATE BANK COLONY", "A.PRIVU", "LAKSHMI PURAM", "PSNACET"],
+"PSNA-51": ["GURU THEATRE", "THEEKKATHIR", "FATHIMA COLLEGE", "KARISAL KULAM", "VILANGUDI", "VISTHARA APARTMENT", "MADHURAI RADHA", "PARAVAI", "POWER HOUSE", "SAMAYANALLUR", "AYYAMKOΟΤΑΙ", "PSNACET"],
+"PSNA-34": ["PERIYAKULAM BHARATHIPURAM", "PERIYAKULAM GANDHI STATUE", "JAYA THEATRE", "RMTC SET", "DEVATHANAPATTY", "KOVILPATTY", "GATT ROAD", "SENGULAM PIRIVU", "MEENATCHIPURAM", "OLD BATTALAGUNDU", "MEENATCHI HOTEL", "MUTHALAPURAM", "OTTUPPATTY", "SALAI PUDUR", "SITHAYANKOTTAI PIRIVU", "PSNACET"],
+"PSNA-33/39": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
+"PSNA-53": ["VIRAGANOOR RING ROAD", "ILANALLU R (VIRAGANOOR)", "NIRMALA SCHOOL", "SANTHA PETTAI", "ICICI BANK", "ALANGAR THEATRE", "KEELAVASAAL", "PSNACET"],
+"PSNA-54": ["SIMMAKKAL", "THAMILSANGAM ROAD(BELL HOTEL)", "MADURA COATS", "JAIL ROAD", "MATHI THEATRE", "AGARWAL HOSPITAL-AARAPALAYAM", "PSNACET"],
+"PSNA-44": ["KADACHANENTHAL", "SURYA NAGAR", "SERVEYER COLONY", "MOONDRU MAVADI", "ALAGAR NAGAR", "K PUDUR", "I.T. STOP", "THAMARAI THOTTI", "OUT POST", "THALLAKULAM", "THAMUKKAM", "GORIPALAYAM", "PSNACET"],
+"PSNA-40": ["AIRPORT/PERUNGUDI", "AVANIYAPURAM BYE PASS", "AVANIYAPURAM", "M.M.C COLONY", "PADMA THEATRE", "MEENATCHI NAGAR", "VILLAPURAM ARCH", "JAYA VILAS", "PSNACET"],
+"PSNA-59": ["OTHAKADAI", "HIGH COURT", "VALAR NAGAR", "UTHANGUDI", "MATTUTHAVANI", "POO MARKET", "ENFILD COMPANY", "SUNDARAM PARK -", "APPOLO HOSPITAL", "MELAMADAI SIGNAL", "PALPANNAI", "ANNA BUS STAND", "MEDICAL COLLEGE", "PSNACET"],
+"PSNA-42": ["THABAL THANTHI NAGAR", "RICE MILL STOP", "VALLUVAR COLONY", "BHARATHI STORE", "BHARATHI NAGAR", "SELLUR", "J.J.PALAM(ESI)", "KONNAVAYAN SALAI", "PSNACET"],
+"PSNA-43": ["KAPPALUR", "THIYAGARAJAN MILL", "KAPPALUR SHIPGATE", "MADURAI CHILDRENS SCHOOL", "KOOTHIYAR GUNDU", "THOPPUR", "THANAKKAN KULAM", "MULLAINAGAR", "THIRUNAGAR", "THIRUNAGAR THIRD STOP", "HARVIPATTY", "PSNACET"],
+"PSNA-46": ["OOMATCHI KULAM", "YADAVA COLLEGE - GENTS", "YADAVA COLLEGE - LADIES", "THIRUPPALAI", "KRISHNA NAGAR", "BANK COLONY", "NARAYANAPURAM", "RESERVE LINE", "MARIYAMMAN KOVIL", "PSNACET"],
+"PSNA-57": ["ALANGANALLUR", "SIKKANTHAR SAVADI", "EB OFFICE", "RADIO STATION", "KOODAL NAGAR", "SANTHI NAGAR", "AALAMARAM", "PSNACET"],
+"PSNA-48": ["NAGAMALAI PUDUKOTTAI", "SVN COLLEGE", "MAAVU MILL", "PILLAR SALAI", "RAJAMPADI", "PULIYAMKULAM", "CHEKKANOORANI", "MELAKKAL", "THACHAMBATHU", "SOZHAVANTHAN", "SOZHAVANTHAN THIRD STOP", "KARUPPATTY RAILWAY JUNCTION", "KEELANATCHI KULAM", "PSNACET"],
+"PSNA-49": ["THIRUPARANKUNDRAM POONGA", "MOOLAKKARAI", "PASUMALAI", "ALAGAPPAN NAGAR", "BYKARA", "PALANGA NATHAM", "PSNACET"],
+"PSNA-52": ["KRISHNAPURAM COLONY (P.P.KULAM)", "P.P.KULAM", "LADY DOOK COLLEGE", "NARIMEDU", "PSNACET"],
+"PSNA-41": ["P.C.PERUKAYAM", "GOMATHI PURAM", "MELAMADAI", "KOCHA COMPLEX", "SUGUNA STORE", "AMBIGA THEATRE", "VAIGAI COLONY", "THEPPAKULAM", "GANESH THEATRE", "PSNACET"],
+"PSNA-55": ["POTHAMETTUPPATTI", "MANAPPARAI BUS STAND", "MANGAMPATTI", "MULLIPADI", "AZAD ROAD", "VAIYAMPATTI", "PONNAMPALAMPATTI", "NADUPPATTI", "KALPATTI", "THANGAMMΜΑPATTI", "AYYALLUR", "MOORPATTI", "VADAMADURAI", "VADAMADURAI BUS STAND", "THANNEER THOTTI", "VADAMADURAI BYE-PASS", "SIVA MILL", "RAJAKKAPATTI", "SBM COLLEGE", "THAMARAIPADI", "MULLIPPADI", "PSNACET"],
+"PSNA-50": ["PRC", "KFC", "PONMENI", "CHOKKALINGANAGAR", "PSNACET"],
+"PSNA-58": ["SILUKKUVAR PATTY", "NILAKOTTAI", "MICHAELPALAYAM", "AACHIPURAM", "OTTUPPATTY", "KAMAKKAPATTYPRIVU", "METTUPATTY", "SEMPATTI", "AADHILAKSHMI PURAM", "VEERAKKAL PIRIVU", "VAKKAMPATTY PIRIVU", "ARIYANALLUR PIRIVU", "PANJAM PATTY PIRIVU (WEST)", "PITHALAPATTY", "PSNACET"],
+"PSNA-60": ["KALLAR KALVI KALAGAM", "THENI GANAPATHY SILKS", "NEHRU SILAI", "PILLAIYAR KOVIL", "CONVENT", "ARAVIND HOSPITAL", "BOMMAYAGOUNDAN PATTY", "RATHINAM NAGAR", "LAKSHMIPURAM", "COLLEGE VILAKKU", "MOONDRANTHAL", "PERIYAKULAM RMTC DEPO", "PSNACET"],
+"PSNA-61": ["MAHAL", "THAVITTU SANDHAI", "THERKUVASAL", "SAPPANI KOVIL", "CRIME BRANCH", "PERIYAR BUS STAND", "MA PALAYAM", "ESI", "DEVAGI SCAN", "PSNACET"],
+"PSNA-69": ["MA.MU.KOVILUR PIRIVU", "POLICE QUARTERS", "SEELAPADI BYE.PASS", "OIL MILL", "NIVIS MAHAL", "CHETTINAICKEN PATTI PIRIVU", "ANJALI BYE.PASS", "PSNACET"],
+"PSNA-73": ["SMBM SCHOOL", "MSP SCHOOL", "AMMA MESS", "12TH CROSS", "9TH CROSS", "7TH CROSS", "WATER TANK", "4TH CROSS", "MVM COLLEGE", "ANJALI BYE PASS", "PSNACET"],
+"PSNA-72": ["DGL SCAN", "DGL BUS STAND", "DGL GH", "AARIYABHAVAN", "VANI VILAS SIGNAL", "PALANI BYE.PASS", "PSNACET"],
+"PSNA-74": ["PATTIVEERAN PATTY", "ANNA NAGAR", "SAVADI", "RADIO POTTAL", "GANDHI PURAM", "THEVARAN PATTY PIRIVU", "VEPPAMARAM", "ARASAMARAM", "GANESHAPURAM", "AATHUR TALUK OFFICE", "AATHUR BUS STAND", "S PARAI PATTY", "DHARUMATHUPATTY", "KANNIVADI", "AALATHURAN PATTY", "PUDHUPATTY", "REDDIYAR CHATRAM", "PSNACET"],
+"PSNA-30": ["MURUGABHAVANAM", "AYYANGULAM", "SAKTHI TALKIES", "AARIYABHAVAN", "VANI VILAS", "JEGANATH HOSPITAL", "SONA TOWER", "AMMA MESS", "12TH CROSS", "9TH CROSS", "8TH CROSS", "7TH CROSS", "WATER TANK", "4TH CROSS", "MVM COLLEGE", "ANJALI BYE PASS", "PSNACET"],
+"PSNA-20": ["ATHIKARIPATTI", "SILUVATHUR", "PUGAIYELAIPATTI PIRIVU", "PANNAI PATTY PIRIVU", "RAJAKKA PATTY", "M.M.KOVILUR PIRIVU (2)", "SOUNDRARAJA AIRPORT", "UTHANAMPATTY PRIVU", "BALAKRISHNAPURAM", "SMBM SCHOOL", "PSNACET"],
+"PSNA-23/22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTI", "PONNAGARAM", "ITI", "PSNACET"],
+"PSNA-28": ["VADIPATTI", "VADIPATTI CHURCH", "PANDIYARAJAPURAM PRIVU", "PALLAPATTI PRIVU", "AMMAYANAYAKKANUR", "KODAIROAD", "TOLL GATE", "KOZHINJIPATTI PIRIVU", "KAMALAPURAM", "AMBATHURAI", "AANGANEYAR KOVIL", "PSNACET"],
+"PSNA-29": ["BALAKRISHNAPURAM", "SMBM SCHOOL", "SP OFFICE", "DGL SCAN", "DGL BUS STAND", "DGL G.H", "AARIYABHAVAN", "PALANI BYE.PASS", "PSNACET"],
+"PSNA-31/56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
+"PSNA-36": ["CHINNALAPATTY", "POONCHOLAI", "CHINNALAPATTY PIRIVU", "KEELAKOTTAI BYE-PASS", "CHETTIYAPATTY PIRIVU", "KALIKAM PATTY PIRIVU", "POKUVARATHU NAGAR", "VELLODU PIRIVU", "PANJAM PATTY PIRIVU (EAST)", "COFFEE SHOP", "ANNAMALAYAR MILL", "THOMAYARPURAM", "PSNACET"],
+"PSNA-35": ["SMBM SCHOOL", "SP OFFICE", "SP OFFICE", "DGL BUS STAND", "AARIYABHAVAN", "VANI VILAS SIGNAL", "PALANI BYE-PASS", "PSNACET"],
+"PSNA-32": ["MA.MU.KOVILUR PIRIVU", "SEELAPADI BYE.PASS", "NGA MILL", "NGO COLONY", "UZAVAR SANTHAI", "CITY HOSPITAL", "PSNACET"]
+
 }
 
 // Helper function to get default routes for a bus
@@ -278,6 +190,18 @@ app.post('/make-server-8b08beda/send-reset-code', async (c) => {
       return c.json({ error: 'Email is required' }, 400)
     }
 
+    // Check if user exists
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+    if (listError) {
+      console.log('Error checking user:', listError)
+      return c.json({ error: 'Failed to verify email' }, 500)
+    }
+
+    const userExists = users.find(u => u.email === email)
+    if (!userExists) {
+      return c.json({ error: 'No account found with this email' }, 404)
+    }
+
     // Generate 6-digit verification code
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     const resetId = `reset:${email}:${Date.now()}`
@@ -293,11 +217,58 @@ app.post('/make-server-8b08beda/send-reset-code', async (c) => {
 
     await kv.set(resetId, resetData)
 
-    // In a real implementation, send email via Supabase
-    // For now, just return success (code would be sent to console in dev)
-    console.log(`Password reset code for ${email}: ${code}`)
+    // Send email using Resend API
+    try {
+      const resendApiKey = Deno.env.get('RESEND_API_KEY')
+      
+      if (resendApiKey) {
+        const emailResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendApiKey}`
+          },
+          body: JSON.stringify({
+            from: 'BusTracker <onboarding@resend.dev>',
+            to: email,
+            subject: 'BusTracker Password Reset Code',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #8b5cf6;">BusTracker Password Reset</h2>
+                <p>Hello,</p>
+                <p>You requested to reset your password. Use the verification code below:</p>
+                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                  <h1 style="color: #1f2937; font-size: 32px; letter-spacing: 8px; margin: 0;">${code}</h1>
+                </div>
+                <p>This code will expire in <strong>5 minutes</strong>.</p>
+                <p>If you didn't request this, please ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                <p style="color: #6b7280; font-size: 12px;">BusTracker - Live Bus Location Tracking</p>
+              </div>
+            `
+          })
+        })
 
-    return c.json({ success: true, message: 'Verification code sent' })
+        if (!emailResponse.ok) {
+          const errorData = await emailResponse.json()
+          console.log('Email sending failed:', errorData)
+          throw new Error('Email API failed')
+        }
+
+        console.log(`Password reset code sent to ${email}`)
+        return c.json({ success: true, message: 'Verification code sent to your email' })
+      } else {
+        // Fallback: Log to console if no API key configured
+        console.log(`⚠️ RESEND_API_KEY not configured. Password reset code for ${email}: ${code}`)
+        console.log(`Please configure RESEND_API_KEY environment variable for email functionality`)
+        return c.json({ success: true, message: 'Verification code sent (check console logs)' })
+      }
+    } catch (emailError) {
+      console.log('Email sending error:', emailError)
+      // Even if email fails, return success since code is stored
+      console.log(`Password reset code for ${email}: ${code}`)
+      return c.json({ success: true, message: 'Verification code generated (check console logs)' })
+    }
   } catch (error) {
     console.log('Send reset code error:', error)
     return c.json({ error: 'Failed to send reset code' }, 500)
@@ -392,7 +363,8 @@ app.post('/make-server-8b08beda/update-coins', async (c) => {
     }
 
     let newCoins = userData.coins || 0
-    if (operation === 'add') {
+    if (true)//(operation === 'add') 
+    {
       newCoins += amount
     } else if (operation === 'subtract') {
       newCoins = Math.max(0, newCoins - amount)
@@ -402,7 +374,7 @@ app.post('/make-server-8b08beda/update-coins', async (c) => {
     await kv.set(`user:${user.id}`, updatedUser)
 
     return c.json({ coins: newCoins })
-  } catch (error) {
+  } catch (error){
     console.log('Coin update error:', error)
     return c.json({ error: 'Failed to update coins' }, 500)
   }
@@ -458,7 +430,7 @@ app.post('/make-server-8b08beda/driver/status', async (c) => {
 
     await kv.set(`driver:${user.id}`, driverData)
 
-    // Track trip history (coin rewards disabled - future feature for payment integration)
+    // Track trip history and award coins for location sharing
     if (isOnline && location && busName) {
       // Check if this is a new trip
       const tripHistory = userData.tripHistory || []
@@ -470,7 +442,7 @@ app.post('/make-server-8b08beda/driver/status', async (c) => {
       
       const updatedUser = { 
         ...userData,
-        // coins: (userData.coins || 0) + 10, // Disabled - will be enabled with payment gateway
+        coins: (userData.coins || 0) + 10, // Award 10 coins for sharing location
         tripHistory: [...tripHistory, newTrip]
       }
       await kv.set(`user:${user.id}`, updatedUser)
@@ -620,6 +592,10 @@ app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
     // Mark OTP as used
     await kv.set(validOTP.id, { ...validOTP, used: true, usedBy: user.id, usedAt: new Date().toISOString() })
 
+    // Award 10 coins to the user for sharing location
+    const currentCoins = userData.coins || 0
+    await kv.set(`user:${user.id}`, { ...userData, coins: currentCoins + 10 })
+
     // Create bus entry (passenger acting as driver)
     const busStops = await getDefaultRoutesForBus(busName)
     
@@ -659,7 +635,9 @@ app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
     return c.json({ 
       success: true, 
       share: shareData,
-      message: 'Location sharing started! Valid for 5 hours.'
+      message: 'Location sharing started! Valid for 5 hours. +10 coins earned!',
+      coinsEarned: 10,
+      newBalance: currentCoins + 10
     })
   } catch (error) {
     console.log('Location sharing error:', error)
@@ -1032,6 +1010,72 @@ app.post('/make-server-8b08beda/buses/add', async (c) => {
   } catch (error) {
     console.log('Adding bus error:', error)
     return c.json({ error: 'Failed to add bus' }, 500)
+  }
+})
+
+// AI Chatbot endpoint
+app.post('/make-server-8b08beda/chatbot', async (c) => {
+  try {
+    const { message } = await c.req.json()
+    
+    if (!message) {
+      return c.json({ error: 'Message is required' }, 400)
+    }
+
+    const lowerMessage = message.toLowerCase()
+    
+    // Get all buses data
+    const allBuses = await kv.getByPrefix('bus:')
+    const availableBuses = await initializeDefaultBuses()
+    const onlineBuses = allBuses.filter(bus => bus.isOnline)
+    const offlineBuses = availableBuses.length - onlineBuses.length
+
+    let response = ''
+
+    // Check for specific bus route query
+    const busMatch = lowerMessage.match(/psna[-\s]?(\d+|[\d\/]+)/i)
+    if (busMatch) {
+      const busNumber = busMatch[1]
+      const busName = `PSNA-${busNumber}`
+      
+      const busRoute = DEFAULT_BUS_ROUTES[busName]
+      if (busRoute) {
+        response = `📍 **Routes for ${busName}**\n\n${busRoute.map((stop, i) => `${i + 1}. ${stop}`).join('\n')}\n\n✅ Total stops: ${busRoute.length}`
+      } else {
+        response = `❌ Sorry, I don't have route information for ${busName}. This bus may not be in our system.`
+      }
+    }
+    // How many buses online/offline
+    else if (lowerMessage.includes('online') || lowerMessage.includes('offline')) {
+      response = `🚌 **Bus Status**\n\n✅ Online: ${onlineBuses.length} buses\n⏸️ Offline: ${offlineBuses} buses\n📊 Total buses in app: ${availableBuses.length}\n\n${onlineBuses.length > 0 ? `Currently online buses:\n${onlineBuses.map(bus => `• ${bus.route}`).join('\n')}` : 'No buses are currently online.'}`
+    }
+    // How many buses in app
+    else if (lowerMessage.includes('how many') && lowerMessage.includes('bus')) {
+      response = `📊 **Total Buses in App**: ${availableBuses.length}\n\n✅ Currently online: ${onlineBuses.length}\n⏸️ Currently offline: ${offlineBuses}\n\nAvailable buses:\n${availableBuses.slice(0, 10).join(', ')}${availableBuses.length > 10 ? ` ...and ${availableBuses.length - 10} more` : ''}`
+    }
+    // List all buses
+    else if (lowerMessage.includes('list') && lowerMessage.includes('bus')) {
+      response = `🚌 **All Available Buses**:\n\n${availableBuses.join(', ')}\n\n📊 Total: ${availableBuses.length} buses`
+    }
+    else if (lowerMessage.includes('owner') && lowerMessage.includes('app')) {
+      response = `🚌 **GOKUL K**:\n His mail id is gokulk24cb@psnacet.edu.in`
+    }
+    else if (lowerMessage.includes('psna') && lowerMessage.includes('details')) {
+      response = `🚌 **PSNACET BUSES**:\n visit psnacet offcial website.`
+    }
+    // Help/default response
+    else {
+      response = `👋 **Hi! I'm your BusTracker AI Assistant**\n\nI can help you with:\n\n🔹 **Bus Routes**: Ask "Tell me the routes of bus PSNA-30"\n🔹 **Bus Status**: Ask "How many buses are online?"\n🔹 **Bus Count**: Ask "How many buses in app?"\n🔹 **List Buses**: Ask "List all buses"\n\nWhat would you like to know?`
+    }
+
+    return c.json({ 
+      success: true, 
+      response,
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.log('Chatbot error:', error)
+    return c.json({ error: 'Failed to process chatbot request' }, 500)
   }
 })
 

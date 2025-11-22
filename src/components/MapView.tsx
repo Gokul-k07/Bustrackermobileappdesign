@@ -234,39 +234,9 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     const routeLayer = markersRef.current['routeLayer'];
     markersRef.current = routeLayer ? { routeLayer } : {};
 
-    // Only show user location if:
-    // 1. User is a passenger AND is sharing location (show as bus icon)
-    // 2. User is a driver AND is online (don't show - will be shown as bus)
-    // 3. Location permission is granted AND user wants to see their location
-    
-    // For passengers sharing location, show as purple bus icon (same as other buses they're tracking)
-    if (userRole === 'passenger' && isLocationSharing && locationPermissionGranted) {
-      const userSharingIcon = L.divIcon({
-        html: `
-          <div style="
-            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            border: 2px solid white;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-          ">🚌</div>
-        `,
-        className: 'custom-marker',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-
-      const userMarker = L.marker([currentLocation.lat, currentLocation.lng], { icon: userSharingIcon })
-        .addTo(mapInstance.current)
-        .bindPopup(`<div style="color: #1f2937; font-family: sans-serif;"><b>Your Location</b><br/>Sharing Active<br/>Lat: ${currentLocation.lat.toFixed(4)}<br/>Lng: ${currentLocation.lng.toFixed(4)}</div>`);
-      
-      markersRef.current['user'] = userMarker;
-    }
+    // Note: Passenger location sharing is handled by showing them in the bus list
+    // They will appear as a regular bus marker with their chosen bus name
+    // No need to add a separate user location marker
 
     // Add bus markers with PURPLE/MAGENTA color
     onlineBuses.forEach((bus) => {
@@ -379,31 +349,93 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     // Create route layer group
     const routeLayer = L.layerGroup().addTo(mapInstance.current);
     
-    // Draw route line with gradient effect (magenta/purple)
+    // Draw route line with road routing (blue lines like Google Maps)
     const routeCoordinates: [number, number][] = [];
+    const stopCoordinates: Array<{ lat: number; lng: number; stop: any; index: number }> = [];
     
     // Add bus current position as start
     routeCoordinates.push([bus.lat, bus.lng]);
     
-    // Add all stops - use actual lat/lng if available, otherwise generate around bus location
+    // Collect all stop coordinates
     stops.forEach((stop, index) => {
       let lat, lng;
       
       if (stop.lat && stop.lng) {
-        // Use actual coordinates if available
         lat = stop.lat;
         lng = stop.lng;
       } else {
-        // Generate coordinates around bus location if not set
         const offset = 0.01;
         const angle = (index / stops.length) * Math.PI * 2;
         lat = bus.lat + Math.sin(angle) * offset * (index + 1);
         lng = bus.lng + Math.cos(angle) * offset * (index + 1);
       }
       
+      stopCoordinates.push({ lat, lng, stop, index });
       routeCoordinates.push([lat, lng]);
-      
-      // Add stop marker
+    });
+
+    // Fetch road routing using OpenRouteService
+    const fetchRoadRoute = async () => {
+      try {
+        const waypoints = [[bus.lng, bus.lat], ...stopCoordinates.map(s => [s.lng, s.lat])];
+        
+        const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': '5b3ce3597851110001cf6248daf7f456fc7644888f8e8c5e08c88ce4'
+          },
+          body: JSON.stringify({
+            coordinates: waypoints
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const coordinates = data.routes[0].geometry.coordinates;
+          
+          // Draw road route with segments
+          coordinates.forEach((coord: any, i: number) => {
+            if (i < coordinates.length - 1) {
+              const startCoord = coord;
+              const endCoord = coordinates[i + 1];
+              
+              // Check if this segment has been passed by the bus
+              const isPassed = false; // You can implement logic to check if segment is passed
+              
+              L.polyline(
+                [[startCoord[1], startCoord[0]], [endCoord[1], endCoord[0]]],
+                {
+                  color: isPassed ? '#9ca3af' : '#3b82f6', // Gray for passed, blue for active
+                  weight: 5,
+                  opacity: isPassed ? 0.5 : 0.8
+                }
+              ).addTo(routeLayer);
+            }
+          });
+        } else {
+          // Fallback to straight lines if API fails
+          throw new Error('API failed');
+        }
+      } catch (error) {
+        console.warn('Road routing failed, using straight lines:', error);
+        // Fallback: draw straight lines
+        for (let i = 0; i < routeCoordinates.length - 1; i++) {
+          const isPassed = stopCoordinates[i - 1]?.stop?.passed || false;
+          L.polyline(
+            [routeCoordinates[i], routeCoordinates[i + 1]],
+            {
+              color: isPassed ? '#9ca3af' : '#3b82f6',
+              weight: 5,
+              opacity: isPassed ? 0.5 : 0.8
+            }
+          ).addTo(routeLayer);
+        }
+      }
+    };
+
+    // Add stop markers
+    stopCoordinates.forEach(({ lat, lng, stop, index }) => {
       const stopIcon = L.divIcon({
         html: `
           <div style="
@@ -431,13 +463,8 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
         .addTo(routeLayer);
     });
 
-    // Draw polyline
-    L.polyline(routeCoordinates, {
-      color: '#ec4899',
-      weight: 4,
-      opacity: 0.8,
-      dashArray: '10, 5'
-    }).addTo(routeLayer);
+    // Fetch and draw road route
+    fetchRoadRoute();
 
     routeLayerRef.current = routeLayer;
     markersRef.current['routeLayer'] = routeLayer;
@@ -646,12 +673,12 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
         <CardContent className="p-0 relative">
           <div 
             ref={mapRef} 
-            className="w-full h-96 bg-gray-900 rounded-lg overflow-hidden"
-            style={{ minHeight: '400px' }}
+            className="w-full h-96 bg-gray-900 rounded-lg overflow-hidden relative"
+            style={{ minHeight: '500px', zIndex: 1 }}
           />
           
           {!mapLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
               <div className="text-center">
                 <Bus className="h-8 w-8 text-gray-400 mx-auto mb-2 animate-pulse" />
                 <p className="text-gray-400">Loading interactive map...</p>
@@ -660,7 +687,7 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
           )}
 
           {/* Map Attribution */}
-          <div className="absolute bottom-1 right-1 bg-black/70 px-2 py-1 rounded text-xs text-white/70 z-[1000]">
+          <div className="absolute bottom-1 right-1 bg-black/70 px-2 py-1 rounded text-xs text-white/70 z-[400] pointer-events-none">
             © MapTiler
           </div>
         </CardContent>
@@ -703,34 +730,78 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
                   )}
                 </div>
               ) : (
-                <div className="divide-y">
-                  {/* Column Headers - Removed Access column */}
-                  <div className="grid grid-cols-11 gap-2 p-3 bg-gray-50 text-xs font-medium text-gray-600">
-                    <div className="col-span-1">Stop</div>
-                    <div className="col-span-3">Start Time</div>
-                    <div className="col-span-3">End Time</div>
-                    <div className="col-span-4">Stop Name</div>
+                <div className="overflow-x-auto">
+                  <div className="flex gap-3 p-4 min-w-max">
+                    {stopsWithTimes.map((stop, index) => {
+                      const distanceFromStart = index > 0 ? calculateDistance(
+                        selectedBus.lat, selectedBus.lng,
+                        stop.lat || selectedBus.lat, stop.lng || selectedBus.lng
+                      ) : 0;
+                      
+                      const distanceFromCurrent = currentLocation.lat && currentLocation.lng 
+                        ? calculateDistance(
+                            currentLocation.lat, currentLocation.lng,
+                            stop.lat || selectedBus.lat, stop.lng || selectedBus.lng
+                          )
+                        : 0;
+                      
+                      const estimatedTime = (distanceFromCurrent / 30) * 60; // Assuming 30 km/h average
+                      
+                      return (
+                        <Card 
+                          key={stop.id}
+                          className={`min-w-[200px] ${stop.passed ? 'bg-gray-100' : ''}`}
+                        >
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Badge variant={stop.passed ? "secondary" : "default"}>
+                                Stop {index + 1}
+                              </Badge>
+                              {stop.passed && <CheckCircle className="h-4 w-4 text-gray-400" />}
+                            </div>
+                            
+                            <h4 className={`font-medium ${stop.passed ? 'text-gray-500 line-through' : ''}`}>
+                              {stop.name}
+                            </h4>
+                            
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div className="flex justify-between">
+                                <span>Start:</span>
+                                <span className="font-medium">{stop.outbound.start}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>End:</span>
+                                <span className="font-medium">{stop.outbound.end}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-1">
+                                <span>From Start:</span>
+                                <span className="font-medium">{distanceFromStart.toFixed(2)} km</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>From You:</span>
+                                <span className="font-medium">{distanceFromCurrent.toFixed(2)} km</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Est. Time:</span>
+                                <span className="font-medium">{Math.round(estimatedTime)} min</span>
+                              </div>
+                            </div>
+                            
+                            {canEditBus && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => handleStopToggle(stop.id, stop.passed)}
+                              >
+                                {stop.passed ? 'Mark Pending' : 'Mark Passed'}
+                              </Button>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
-
-                  {/* Stop Rows - Same routes for morning and evening */}
-                  {stopsWithTimes.map((stop, index) => (
-                    <div 
-                      key={stop.id} 
-                      className={`grid grid-cols-11 gap-2 p-3 text-sm hover:bg-gray-50 transition-colors ${
-                        stop.passed ? 'bg-gray-100' : ''
-                      }`}
-                    >
-                      <div className="col-span-1 font-medium text-purple-600">
-                        {index + 1}
-                      </div>
-                      <div className="col-span-3 text-gray-600">{stop.outbound.start}</div>
-                      <div className="col-span-3 text-gray-600">{stop.outbound.end}</div>
-                      <div className="col-span-4 flex items-center gap-2">
-                        {stop.passed && <CheckCircle className="h-4 w-4 text-gray-400" />}
-                        <span className={stop.passed ? 'text-gray-500 line-through' : 'font-medium'}>{stop.name}</span>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>

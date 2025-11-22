@@ -39,6 +39,8 @@ export function DriverDashboard({
   const [selectedBus, setSelectedBus] = useState<string>('');
   const [showAddNewBus, setShowAddNewBus] = useState(false);
   const [newBusName, setNewBusName] = useState('');
+  const [busError, setBusError] = useState<string>('');
+  const [busesInUse, setBusesInUse] = useState<string[]>([]);
 
   const activeOTPs = otps.filter(otp => !otp.used && new Date() < new Date(otp.expiresAt));
   const recentOTP = activeOTPs[activeOTPs.length - 1];
@@ -52,6 +54,14 @@ export function DriverDashboard({
     try {
       const buses = await getAvailableBuses();
       setAvailableBuses(buses);
+      
+      // Fetch all active bus locations to determine which buses are in use
+      const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/buses`);
+      if (response.ok) {
+        const data = await response.json();
+        const activeBusNames = data.buses.map((bus: any) => bus.route);
+        setBusesInUse(activeBusNames);
+      }
     } catch (error) {
       console.error('Failed to load buses:', error);
       toast.error('Failed to load bus list');
@@ -84,8 +94,11 @@ export function DriverDashboard({
   const handleStartTrip = () => {
     if (isOnline) {
       onToggleOnline();
+      setBusError('');
     } else {
+      setBusError('');
       setShowBusSelectionDialog(true);
+      loadAvailableBuses(); // Refresh the list of buses in use
     }
   };
 
@@ -94,7 +107,19 @@ export function DriverDashboard({
       toast.error('Please select a bus');
       return;
     }
+    
+    // Check if the bus is already in use
+    if (busesInUse.includes(selectedBus)) {
+      toast.error('This bus location is already being shared');
+      setBusError('❌ Driver status update error: Error: This bus location is already being shared');
+      setShowBusSelectionDialog(false);
+      setSelectedBus('');
+      setShowAddNewBus(false);
+      return;
+    }
+    
     setShowBusSelectionDialog(false);
+    setBusError('');
     onToggleOnline(selectedBus);
     setSelectedBus('');
     setShowAddNewBus(false);
@@ -152,6 +177,12 @@ export function DriverDashboard({
               </>
             )}
           </Button>
+          
+          {busError && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {busError}
+            </div>
+          )}
           
           {isOnline && (
             <div className="text-sm text-muted-foreground text-center">
@@ -375,11 +406,19 @@ export function DriverDashboard({
                       <SelectValue placeholder="Select a bus..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableBuses.map((bus) => (
-                        <SelectItem key={bus} value={bus}>
-                          {bus}
-                        </SelectItem>
-                      ))}
+                      {availableBuses.map((bus) => {
+                        const isInUse = busesInUse.includes(bus);
+                        return (
+                          <SelectItem 
+                            key={bus} 
+                            value={bus}
+                            disabled={isInUse}
+                            className={isInUse ? 'text-gray-400 cursor-not-allowed' : ''}
+                          >
+                            {bus} {isInUse && '(Already Shared)'}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground mt-1">
