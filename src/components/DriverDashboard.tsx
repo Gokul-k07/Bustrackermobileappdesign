@@ -9,7 +9,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { OTP, LocationShare } from '../App';
-import { getAvailableBuses, addNewBus } from '../utils/api';
+import { apiClient, getAvailableBuses, addNewBus } from '../utils/api';
 
 interface DriverDashboardProps {
   isOnline: boolean;
@@ -56,12 +56,9 @@ export function DriverDashboard({
       setAvailableBuses(buses);
       
       // Fetch all active bus locations to determine which buses are in use
-      const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/buses`);
-      if (response.ok) {
-        const data = await response.json();
-        const activeBusNames = data.buses.map((bus: any) => bus.route);
-        setBusesInUse(activeBusNames);
-      }
+      const data = await apiClient.getBuses();
+      const activeBusNames = (data.buses || []).map((bus: any) => bus.route);
+      setBusesInUse(activeBusNames);
     } catch (error) {
       console.error('Failed to load buses:', error);
       toast.error('Failed to load bus list');

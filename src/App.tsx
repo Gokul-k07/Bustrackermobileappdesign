@@ -28,6 +28,7 @@ export interface User {
   email: string;
   role: UserRole;
   coins?: number;
+  linkedDriverId?: string | null;
 }
 
 export interface BusStop {
@@ -48,6 +49,9 @@ export interface BusLocation {
   isOnline: boolean;
   lastUpdated: string;
   busStops?: BusStop[];
+  routeId?: string;
+  driverId?: string;
+  sharedByUserId?: string | null;
 }
 
 export interface LocationShare {
@@ -59,6 +63,18 @@ export interface LocationShare {
   active: boolean;
   startTime: string;
   driverId: string;
+  lastUpdated?: string;
+  expiresAt?: string;
+}
+
+export interface RouteMeta {
+  routeId: string;
+  driverId: string;
+  sharedByUserId?: string | null;
+  stops: BusStop[];
+  passedStops: string[];
+  editable: boolean;
+  canMarkPassed: boolean;
 }
 
 export interface OTP {
@@ -77,6 +93,14 @@ const supabase = createClient(
 );
 
 export default function App() {
+  const shouldSilenceBackgroundError = (message?: string) => {
+    if (!message) return false;
+    return (
+      message.includes('Authentication failed') ||
+      message.includes('Invalid or expired token')
+    );
+  };
+
   // App state
   const [currentScreen, setCurrentScreen] = useState<'onboarding' | 'roleSelection' | 'main'>('onboarding');
   const [user, setUser] = useState<User | null>(null);
@@ -86,7 +110,8 @@ export default function App() {
   // Driver state
   const [isOnline, setIsOnline] = useState(false);
   const [otps, setOtps] = useState<OTP[]>([]);
-  const [locationShares, setLocationShares] = useState<LocationShare[]>([]);
+  const [mapLocationShares, setMapLocationShares] = useState<LocationShare[]>([]);
+  const [driverLocationShares, setDriverLocationShares] = useState<LocationShare[]>([]);
 
   // Passenger state
   const [busLocations, setBusLocations] = useState<BusLocation[]>([]);
@@ -286,15 +311,18 @@ export default function App() {
       // Initial data load
       loadUserData();
       loadAvailableBuses(); // Load buses after authentication
+      loadMapData();
+      if (user.role === 'driver') {
+        loadDriverData();
+      }
       
       // Set up periodic updates for real-time location display
       const interval = setInterval(() => {
         if (user.role === 'driver') {
           loadDriverData();
-        } else if (user.role === 'passenger') {
-          loadPassengerData();
         }
-      }, 1000); // Update every second for real-time tracking
+        loadMapData();
+      }, 3000); // Poll every 3 seconds to reduce request noise
 
       return () => clearInterval(interval);
     }
@@ -435,23 +463,27 @@ export default function App() {
       ]);
       
       setOtps(otpsData.otps || []);
-      setLocationShares(sharesData.shares || []);
+      setDriverLocationShares(sharesData.shares || []);
     } catch (error: any) {
       // Don't log errors if user just switched roles or logged out
-      if (error.message && !error.message.includes('Authentication failed')) {
+      if (!shouldSilenceBackgroundError(error.message)) {
         console.warn('Failed to load driver data:', error.message);
       }
     }
   };
 
-  const loadPassengerData = async () => {
+  const loadMapData = async () => {
     try {
-      const busesData = await apiClient.getBuses();
+      const [busesData, sharesData] = await Promise.all([
+        apiClient.getBuses(),
+        apiClient.getAllLocationShares()
+      ]);
       setBusLocations(busesData.buses || []);
+      setMapLocationShares(sharesData.shares || []);
     } catch (error: any) {
       // Don't log errors if user just switched roles or logged out
-      if (error.message && !error.message.includes('Authentication failed')) {
-        console.warn('Failed to load passenger data:', error.message);
+      if (!shouldSilenceBackgroundError(error.message)) {
+        console.warn('Failed to load map data:', error.message);
       }
     }
   };
@@ -560,7 +592,7 @@ export default function App() {
       setIsLocationSharing(true);
       
       // Immediately refresh bus locations to show the passenger as a bus
-      await loadPassengerData();
+      await loadMapData();
       
       toast.success('Location sharing started!', {
         description: `Valid for 3 hours. You earned 10 coins! Your bus: ${busName}`
@@ -589,7 +621,7 @@ export default function App() {
       localStorage.removeItem('bustracker_sharing_state');
       
       // Immediately refresh bus locations to remove the passenger from bus list
-      await loadPassengerData();
+      await loadMapData();
       
       toast.info('Location sharing stopped');
     } catch (error: any) {
@@ -757,7 +789,8 @@ export default function App() {
   const stopPassengerSharing = async (shareId: string) => {
     try {
       await apiClient.stopLocationSharing(shareId);
-      setLocationShares(locationShares.filter(share => share.id !== shareId));
+      setDriverLocationShares(prev => prev.filter(share => share.id !== shareId));
+      setMapLocationShares(prev => prev.filter(share => share.id !== shareId));
       toast.success('Passenger sharing stopped');
     } catch (error: any) {
       console.error('Stop passenger sharing error:', error);
@@ -861,7 +894,7 @@ export default function App() {
                   onToggleOnline={toggleDriverOnline}
                   onGenerateOTP={generateOTP}
                   otps={otps}
-                  locationShares={locationShares}
+                  locationShares={driverLocationShares}
                   currentLocation={currentLocation}
                   onStopOTP={stopOTP}
                   onStopPassengerSharing={stopPassengerSharing}
@@ -885,10 +918,11 @@ export default function App() {
             <div className="p-4">
               <MapView
                 busLocations={busLocations}
-                locationShares={locationShares}
+                locationShares={mapLocationShares}
                 currentLocation={currentLocation}
                 userRole={user.role}
                 userId={user.id}
+                userLinkedDriverId={user.linkedDriverId || null}
                 isLocationSharing={isLocationSharing}
                 locationPermissionGranted={locationPermissionGranted}
               />

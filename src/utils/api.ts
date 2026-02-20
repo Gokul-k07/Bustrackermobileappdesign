@@ -1,6 +1,6 @@
 import { projectId, publicAnonKey } from './supabase/info';
 
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-8b08beda`;
+export const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-8b08beda`;
 
 export interface ApiResponse<T = any> {
   success?: boolean;
@@ -19,7 +19,12 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${API_BASE_URL}${normalizedEndpoint}`;
+    const prefixedEndpoint = normalizedEndpoint.startsWith('/make-server-8b08beda/')
+      ? normalizedEndpoint
+      : `/make-server-8b08beda${normalizedEndpoint}`;
+    const prefixedUrl = `${API_BASE_URL}${prefixedEndpoint}`;
     
     const headers = {
       'Content-Type': 'application/json',
@@ -28,10 +33,20 @@ class ApiClient {
     };
 
     try {
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         ...options,
         headers,
       });
+
+      // Some Supabase edge gateways forward with an extra function slug segment.
+      // Retry once with '/make-server-8b08beda' prefix if the first path 404s.
+      if (!response.ok && response.status === 404 && prefixedUrl !== url) {
+        console.warn(`API 404 for ${url}. Retrying with ${prefixedUrl}`);
+        response = await fetch(prefixedUrl, {
+          ...options,
+          headers,
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -100,6 +115,10 @@ class ApiClient {
     return this.request('/driver/location-shares');
   }
 
+  async getAllLocationShares() {
+    return this.request('/location-shares');
+  }
+
   // Passenger functions
   async startLocationSharing(otpCode: string, location: { lat: number; lng: number }, busName: string) {
     return this.request('/passenger/share-location', {
@@ -155,10 +174,10 @@ class ApiClient {
     return this.request(`/bus/${busId}/stops`);
   }
 
-  async updateBusStop(stopId: string, passed: boolean) {
+  async updateBusStop(busId: string, stopId: string, passed: boolean) {
     return this.request('/driver/update-stop', {
       method: 'POST',
-      body: JSON.stringify({ stopId, passed }),
+      body: JSON.stringify({ busId, stopId, passed }),
     });
   }
 

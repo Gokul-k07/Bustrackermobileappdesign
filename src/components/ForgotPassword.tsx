@@ -6,6 +6,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp';
 import { toast } from 'sonner';
+import { API_BASE_URL } from '../utils/api';
+import { publicAnonKey } from '../utils/supabase/info';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -32,9 +34,12 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     setIsSending(true);
 
     try {
-      const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/send-reset-code`, {
+      const response = await fetch(`${API_BASE_URL}/send-reset-code`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`
+        },
         body: JSON.stringify({ email }),
       });
 
@@ -98,9 +103,12 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     setIsResetting(true);
 
     try {
-      const response = await fetch(`${window.location.origin}/functions/v1/make-server-8b08beda/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`
+        },
         body: JSON.stringify({ email, code: verificationCode, newPassword }),
       });
 
