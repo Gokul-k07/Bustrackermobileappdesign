@@ -115,6 +115,12 @@ class ApiClient {
     });
   }
 
+  async pauseLocationSharing() {
+    return this.request('/passenger/pause-sharing', {
+      method: 'POST'
+    })
+  }
+
   async stopOTP(otpId: string) {
     return this.request('/driver/stop-otp', {
       method: 'POST',

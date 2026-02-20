@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { BusLocation, LocationShare, UserRole, BusStop } from '../App';
 import { apiClient } from '../utils/api';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface MapViewProps {
   busLocations: BusLocation[];
@@ -41,7 +41,9 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
   const [newRouteName, setNewRouteName] = useState('');
   const [isAddingRoute, setIsAddingRoute] = useState(false);
   
-  const onlineBuses = busLocations.filter(bus => bus.isOnline);
+  // Show all visible buses (online or last-known offline within expiry)
+  const visibleBuses = busLocations || [];
+  const onlineBuses = visibleBuses.filter((bus) => bus.isOnline);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -238,22 +240,24 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     // They will appear as a regular bus marker with their chosen bus name
     // No need to add a separate user location marker
 
-    // Add bus markers with PURPLE/MAGENTA color
-    onlineBuses.forEach((bus) => {
+    // Add bus markers (online => vibrant, offline/last-known => faded)
+    visibleBuses.forEach((bus) => {
+      const isOnlineBus = !!bus.isOnline;
       const busIcon = L.divIcon({
         html: `
           <div style="
-            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+            background: ${isOnlineBus ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'linear-gradient(135deg, rgba(167,167,167,0.4) 0%, rgba(200,200,200,0.4) 100%)'};
             width: 32px;
             height: 32px;
             border-radius: 6px;
             border: 2px solid white;
-            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6);
+            box-shadow: 0 4px 12px ${isOnlineBus ? 'rgba(168, 85, 247, 0.6)' : 'rgba(100,100,100,0.2)'};
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 16px;
             cursor: pointer;
+            opacity: ${isOnlineBus ? '1' : '0.6'};
           ">🚌</div>
         `,
         className: 'custom-marker bus-marker',
@@ -266,42 +270,49 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
         .on('click', () => {
           handleBusClick(bus);
         });
-      
+
+      // Popup: show last seen for offline buses
+      if (!isOnlineBus && bus.lastUpdated) {
+        busMarker.bindPopup(`<div style="color: #1f2937; font-family: sans-serif;"><b>${bus.route}</b><br/>Last seen: ${formatTime(bus.lastUpdated)}<br/>Status: Last location</div>`)
+      }
+
       markersRef.current[`bus-${bus.id}`] = busMarker;
     });
 
-    // Add passenger markers - CYAN/TEAL for sharing passengers (driver view only)
-    if (userRole === 'driver') {
-      locationShares.forEach((share) => {
-        const passengerIcon = L.divIcon({
-          html: `
-            <div style="
-              background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%);
-              width: 28px;
-              height: 28px;
-              border-radius: 6px;
-              border: 2px solid white;
-              box-shadow: 0 4px 12px rgba(6, 182, 212, 0.6);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 14px;
-            ">🚌</div>
-          `,
-          className: 'custom-marker',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
-        });
-
-        const passengerMarker = L.marker([share.lat, share.lng], { icon: passengerIcon })
-          .addTo(mapInstance.current)
-          .bindPopup(`<div style="color: #1f2937; font-family: sans-serif;"><b>${share.userName}</b><br/>Passenger Sharing<br/>Since: ${formatTime(share.startTime)}</div>`);
-        
-        markersRef.current[`passenger-${share.id}`] = passengerMarker;
+    // Add passenger markers - show for all users (passengers and drivers)
+    locationShares.forEach((share) => {
+      const isActiveShare = !!share.active;
+      const passengerIcon = L.divIcon({
+        html: `
+          <div style="
+            background: ${isActiveShare ? 'linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%)' : 'linear-gradient(135deg, rgba(150,150,150,0.4) 0%, rgba(180,180,180,0.4) 100%)'};
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 2px solid white;
+            box-shadow: 0 4px 12px ${isActiveShare ? 'rgba(6, 182, 212, 0.6)' : 'rgba(100,100,100,0.2)'};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            opacity: ${isActiveShare ? '1' : '0.6'};
+          ">🚌</div>
+        `,
+        className: 'custom-marker',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
-    }
 
-  }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
+      const popupText = `<div style="color: #1f2937; font-family: sans-serif;"><b>${share.userName}</b><br/>${isActiveShare ? 'Passenger Sharing' : 'Last known location'}<br/>Since: ${formatTime(share.startTime)}</div>`;
+
+      const passengerMarker = L.marker([share.lat, share.lng], { icon: passengerIcon })
+        .addTo(mapInstance.current)
+        .bindPopup(popupText);
+
+      markersRef.current[`passenger-${share.id}`] = passengerMarker;
+    });
+
+  }, [mapLoaded, currentLocation, visibleBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
 
   const handleBusClick = async (bus: BusLocation) => {
     // First click: Show bus details
@@ -1013,3 +1024,4 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     </div>
   );
 }
+

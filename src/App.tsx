@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from './components/ui/textarea';
 import { Label } from './components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from './utils/supabase/info';
 import { apiClient } from './utils/api';
@@ -91,6 +91,7 @@ export default function App() {
   // Passenger state
   const [busLocations, setBusLocations] = useState<BusLocation[]>([]);
   const [isLocationSharing, setIsLocationSharing] = useState(false);
+  const [lastPositionTimestamp, setLastPositionTimestamp] = useState<number | null>(null);
 
   // Current location with geolocation support (default to PSNACET location in Tamil Nadu, India)
   const [currentLocation, setCurrentLocation] = useState({ lat: 10.3673, lng: 77.9738 });
@@ -109,12 +110,46 @@ export default function App() {
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
 
+  const clearAuthState = (message?: string) => {
+    setSession(null);
+    setUser(null);
+    apiClient.setAccessToken(null);
+    setCurrentScreen('onboarding');
+    if (message) {
+      toast.error(message);
+    }
+  };
 
   // Check for existing session, restore state, and setup geolocation on mount
   useEffect(() => {
     restoreAppState();
     checkSession();
     requestLocationPermission();
+  }, []);
+
+  // Watch for auth state changes (handles refresh token failures)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'TOKEN_REFRESH_FAILED') {
+        console.warn('Session refresh failed');
+        clearAuthState('Session expired. Please sign in again.');
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        clearAuthState();
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && nextSession) {
+        setSession(nextSession);
+        apiClient.setAccessToken(nextSession.access_token);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Restore app state from localStorage
@@ -181,6 +216,7 @@ export default function App() {
                   lat: position.coords.latitude,
                   lng: position.coords.longitude
                 });
+                setLastPositionTimestamp(Date.now());
               },
               (error) => {
                 console.warn('Location tracking error:', error);
@@ -283,6 +319,7 @@ export default function App() {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
               };
+              setLastPositionTimestamp(Date.now());
               
               // Update immediately on position change
               try {
@@ -345,7 +382,11 @@ export default function App() {
       
       if (sessionError) {
         console.warn('Session error:', sessionError.message);
-        setCurrentScreen('onboarding');
+        if (sessionError.message?.toLowerCase().includes('refresh token')) {
+          clearAuthState('Session expired. Please sign in again.');
+        } else {
+          clearAuthState();
+        }
         setLoading(false);
         return;
       }
@@ -519,10 +560,10 @@ export default function App() {
       setIsLocationSharing(true);
       
       // Immediately refresh bus locations to show the passenger as a bus
-      await loadBusLocations();
+      await loadPassengerData();
       
       toast.success('Location sharing started!', {
-        description: `Valid for 5 hours. You earned 10 coins! Your bus: ${busName}`
+        description: `Valid for 3 hours. You earned 10 coins! Your bus: ${busName}`
       });
       
       // Refresh user profile to get updated coin balance
@@ -548,7 +589,7 @@ export default function App() {
       localStorage.removeItem('bustracker_sharing_state');
       
       // Immediately refresh bus locations to remove the passenger from bus list
-      await loadBusLocations();
+      await loadPassengerData();
       
       toast.info('Location sharing stopped');
     } catch (error: any) {
@@ -557,7 +598,7 @@ export default function App() {
     }
   };
 
-  // Check for expired sharing (5 hours)
+  // Check for expired sharing (3 hours)
   useEffect(() => {
     const checkSharingExpiry = () => {
       try {
@@ -566,11 +607,11 @@ export default function App() {
           const state = JSON.parse(savedState);
           const startTime = new Date(state.startTime).getTime();
           const now = new Date().getTime();
-          const fiveHours = 5 * 60 * 60 * 1000;
-          
-          if (now - startTime > fiveHours) {
+          const threeHours = 3 * 60 * 60 * 1000;
+
+          if (now - startTime > threeHours) {
             stopLocationSharing();
-            toast.info('Location sharing stopped automatically after 5 hours');
+            toast.info('Location sharing stopped automatically after 3 hours');
           }
         }
       } catch (error) {
@@ -584,6 +625,87 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [isLocationSharing]);
+
+  // Monitor permission state changes (Permissions API) to detect if user turns off device location
+  useEffect(() => {
+    if (!('permissions' in navigator)) return;
+    let permissionStatus: any = null;
+    let cancelled = false;
+
+    navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((p: any) => {
+      if (cancelled) return;
+      permissionStatus = p;
+      permissionStatus.onchange = async () => {
+        try {
+          if (permissionStatus.state !== 'granted') {
+            // If user revokes location while sharing, pause sharing and keep last-known for 3 hours
+            if (user?.role === 'passenger' && isLocationSharing) {
+              await apiClient.pauseLocationSharing();
+              toast.info("Location updates stopped — others will see your last location for up to 3 hours. Turn on location to resume.");
+            }
+
+            if (user?.role === 'driver' && isOnline) {
+              await apiClient.updateDriverStatus(false);
+              setIsOnline(false);
+              toast.info('You were marked offline due to location being disabled');
+            }
+          } else {
+            // Permission granted/resumed: attempt a quick location update to resume sharing
+            if (user?.role === 'passenger' && isLocationSharing) {
+              try { await apiClient.updateLocation(currentLocation); } catch {}
+            }
+            if (user?.role === 'driver' && isOnline) {
+              try { await apiClient.updateDriverStatus(true, currentLocation); } catch {}
+            }
+          }
+        } catch (err) {
+          console.warn('Permission onchange handler error:', err);
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (permissionStatus) permissionStatus.onchange = null;
+    }
+  }, [user, isLocationSharing, isOnline, currentLocation]);
+
+  // Heartbeat: detect if location updates stop (no position update within threshold)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!user) return;
+      const now = Date.now();
+
+      // Passenger: if sharing but no recent position or permission revoked, pause sharing
+      if (user.role === 'passenger' && isLocationSharing) {
+        const missed = lastPositionTimestamp ? (now - lastPositionTimestamp) > 30000 : true;
+        if (!locationPermissionGranted || missed) {
+          try {
+            await apiClient.pauseLocationSharing();
+            toast.info('No recent location updates — showing last known location to others for up to 3 hours.');
+          } catch (err) {
+            console.warn('Failed to pause sharing via heartbeat:', err);
+          }
+        }
+      }
+
+      // Driver: mark offline if no location updates
+      if (user.role === 'driver' && isOnline) {
+        const missed = lastPositionTimestamp ? (now - lastPositionTimestamp) > 30000 : true;
+        if (!locationPermissionGranted || missed) {
+          try {
+            await apiClient.updateDriverStatus(false);
+            setIsOnline(false);
+            toast.info('You were marked offline due to lack of location updates');
+          } catch (err) {
+            console.warn('Failed to mark driver offline via heartbeat:', err);
+          }
+        }
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [user, isLocationSharing, isOnline, locationPermissionGranted, lastPositionTimestamp, currentLocation]);
 
   const toggleDriverOnline = async (busName?: string) => {
     try {

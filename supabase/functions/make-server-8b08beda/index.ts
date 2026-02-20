@@ -118,12 +118,12 @@ async function getDefaultRoutesForBus(busName: string) {
 }
 
 // Routes
-app.get('/make-server-8b08beda/health', (c) => {
+app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 // User registration
-app.post('/make-server-8b08beda/register', async (c) => {
+app.post('/register', async (c) => {
   try {
     const { name, email, password, role } = await c.req.json()
     
@@ -182,7 +182,7 @@ app.post('/make-server-8b08beda/register', async (c) => {
 })
 
 // Send password reset code
-app.post('/make-server-8b08beda/send-reset-code', async (c) => {
+app.post('/send-reset-code', async (c) => {
   try {
     const { email } = await c.req.json()
     
@@ -276,7 +276,7 @@ app.post('/make-server-8b08beda/send-reset-code', async (c) => {
 })
 
 // Reset password with verification code
-app.post('/make-server-8b08beda/reset-password', async (c) => {
+app.post('/reset-password', async (c) => {
   try {
     const { email, code, newPassword } = await c.req.json()
     
@@ -328,7 +328,7 @@ app.post('/make-server-8b08beda/reset-password', async (c) => {
 })
 
 // Get user profile
-app.get('/make-server-8b08beda/profile', async (c) => {
+app.get('/profile', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -348,7 +348,7 @@ app.get('/make-server-8b08beda/profile', async (c) => {
 })
 
 // Update user coins
-app.post('/make-server-8b08beda/update-coins', async (c) => {
+app.post('/update-coins', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -381,7 +381,7 @@ app.post('/make-server-8b08beda/update-coins', async (c) => {
 })
 
 // Driver goes online/offline
-app.post('/make-server-8b08beda/driver/status', async (c) => {
+app.post('/driver/status', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -479,10 +479,16 @@ app.post('/make-server-8b08beda/driver/status', async (c) => {
         lng: location.lng,
         isOnline: true,
         lastUpdated: new Date().toISOString(),
+        expiresAt: null,
         busStops: busStops
       })
     } else {
-      await kv.del(`bus:${user.id}`)
+      // Mark bus as offline but keep last known location for 3 hours
+      const existingBus = await kv.get(`bus:${user.id}`)
+      if (existingBus) {
+        const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+        await kv.set(`bus:${user.id}`, { ...existingBus, isOnline: false, expiresAt, lastUpdated: new Date().toISOString() })
+      }
     }
 
     return c.json({ success: true, status: driverData })
@@ -493,7 +499,7 @@ app.post('/make-server-8b08beda/driver/status', async (c) => {
 })
 
 // Generate OTP
-app.post('/make-server-8b08beda/driver/generate-otp', async (c) => {
+app.post('/driver/generate-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -527,7 +533,7 @@ app.post('/make-server-8b08beda/driver/generate-otp', async (c) => {
 })
 
 // Get driver's active OTPs
-app.get('/make-server-8b08beda/driver/otps', async (c) => {
+app.get('/driver/otps', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -547,7 +553,7 @@ app.get('/make-server-8b08beda/driver/otps', async (c) => {
 })
 
 // Validate OTP and start location sharing (passenger acts as driver)
-app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
+app.post('/passenger/share-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -625,17 +631,18 @@ app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
       lng: location.lng,
       active: true,
       startTime: new Date().toISOString(),
-      expiresAt: validOTP.expiresAt, // 5 hours from OTP creation
+      // Enforce a 3-hour share TTL independent of OTP lifetime
+      expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
       driverId: validOTP.driverId,
       otpCode: otpCode
     }
 
     await kv.set(shareId, shareData)
-
+    
     return c.json({ 
       success: true, 
       share: shareData,
-      message: 'Location sharing started! Valid for 5 hours. +10 coins earned!',
+      message: 'Location sharing started! Valid for 3 hours. +10 coins earned!',
       coinsEarned: 10,
       newBalance: currentCoins + 10
     })
@@ -646,44 +653,76 @@ app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
 })
 
 // Stop location sharing (passenger or driver can stop)
-app.post('/make-server-8b08beda/passenger/stop-sharing', async (c) => {
+app.post('/passenger/stop-sharing', async (c) => {
+  const { error: authError, user } = await authenticateRequest(c.req.raw)
+  if (authError || !user) {
+    return c.json({ error: authError || 'Authentication failed' }, 401)
+  }
+
+    try {
+      const { shareId } = await c.req.json()
+
+      // If shareId provided, stop that specific share (driver stopping passenger)
+      if (shareId) {
+        const share = await kv.get(shareId)
+        if (share) {
+          await kv.set(shareId, { ...share, active: false })
+          // Remove bus entry if passenger was acting as driver
+          await kv.del(`bus:${share.userId}`)
+        }
+      } else {
+        // Stop own sharing (passenger stopping themselves)
+        const shares = await kv.getByPrefix(`share:${user.id}:`)
+        const activeShare = shares.find(share => share.active)
+
+        if (activeShare) {
+          await kv.set(activeShare.id, { ...activeShare, active: false })
+          // Remove bus entry if passenger was acting as driver
+          await kv.del(`bus:${user.id}`)
+        }
+      }
+
+      return c.json({ success: true })
+    } catch (error) {
+      console.log('Stop sharing error:', error)
+      return c.json({ error: 'Failed to stop location sharing' }, 500)
+    }
+})
+
+// Pause location sharing (when device location turned off) - keep last-known for 3 hours
+app.post('/passenger/pause-sharing', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
   }
 
   try {
-    const { shareId } = await c.req.json()
-    
-    // If shareId provided, stop that specific share (driver stopping passenger)
-    if (shareId) {
-      const share = await kv.get(shareId)
-      if (share) {
-        await kv.set(shareId, { ...share, active: false })
-        // Remove bus entry if passenger was acting as driver
-        await kv.del(`bus:${share.userId}`)
-      }
-    } else {
-      // Stop own sharing (passenger stopping themselves)
-      const shares = await kv.getByPrefix(`share:${user.id}:`)
-      const activeShare = shares.find(share => share.active)
-
-      if (activeShare) {
-        await kv.set(activeShare.id, { ...activeShare, active: false })
-        // Remove bus entry if passenger was acting as driver
-        await kv.del(`bus:${user.id}`)
-      }
+    const shares = await kv.getByPrefix(`share:${user.id}:`)
+    const activeShare = shares.find(share => share.active)
+    if (!activeShare) {
+      return c.json({ error: 'No active location sharing found' }, 404)
     }
 
-    return c.json({ success: true })
+    const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+
+    // Mark share as paused and update expiresAt
+    await kv.set(activeShare.id, { ...activeShare, paused: true, lastUpdated: new Date().toISOString(), expiresAt })
+
+    // Update bus entry to be offline but retain last-known and expiresAt
+    const busData = await kv.get(`bus:${user.id}`)
+    if (busData) {
+      await kv.set(`bus:${user.id}`, { ...busData, isOnline: false, expiresAt, lastUpdated: new Date().toISOString() })
+    }
+
+    return c.json({ success: true, paused: true, expiresAt })
   } catch (error) {
-    console.log('Stop sharing error:', error)
-    return c.json({ error: 'Failed to stop location sharing' }, 500)
+    console.log('Pause sharing error:', error)
+    return c.json({ error: 'Failed to pause location sharing' }, 500)
   }
 })
 
 // Stop OTP (Driver can revoke an OTP)
-app.post('/make-server-8b08beda/driver/stop-otp', async (c) => {
+app.post('/driver/stop-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -716,12 +755,20 @@ app.post('/make-server-8b08beda/driver/stop-otp', async (c) => {
 })
 
 // Get all active buses for passengers
-app.get('/make-server-8b08beda/buses', async (c) => {
+app.get('/buses', async (c) => {
   try {
     const buses = await kv.getByPrefix('bus:')
-    const activeBuses = buses.filter(bus => bus.isOnline)
+    // Return online buses and last-known offline buses that haven't expired
+    const now = new Date().getTime()
+    const visibleBuses = buses.filter(bus => {
+      if (bus.isOnline) return true
+      if (bus.expiresAt) {
+        return new Date(bus.expiresAt).getTime() > now
+      }
+      return false
+    })
 
-    return c.json({ buses: activeBuses })
+    return c.json({ buses: visibleBuses })
   } catch (error) {
     console.log('Buses fetch error:', error)
     return c.json({ error: 'Failed to fetch bus locations' }, 500)
@@ -729,7 +776,7 @@ app.get('/make-server-8b08beda/buses', async (c) => {
 })
 
 // Get active location shares for a driver
-app.get('/make-server-8b08beda/driver/location-shares', async (c) => {
+app.get('/driver/location-shares', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -749,7 +796,7 @@ app.get('/make-server-8b08beda/driver/location-shares', async (c) => {
 })
 
 // Update passenger location (for active sharing - passenger acting as driver)
-app.post('/make-server-8b08beda/passenger/update-location', async (c) => {
+app.post('/passenger/update-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -816,7 +863,7 @@ app.post('/make-server-8b08beda/passenger/update-location', async (c) => {
 })
 
 // Get bus stops for a specific bus
-app.get('/make-server-8b08beda/bus/:busId/stops', async (c) => {
+app.get('/bus/:busId/stops', async (c) => {
   try {
     const busId = c.req.param('busId')
     const busData = await kv.get(`bus:${busId}`)
@@ -839,7 +886,7 @@ app.get('/make-server-8b08beda/bus/:busId/stops', async (c) => {
 })
 
 // Update bus stop status (driver marks stop as passed)
-app.post('/make-server-8b08beda/driver/update-stop', async (c) => {
+app.post('/driver/update-stop', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -873,7 +920,7 @@ app.post('/make-server-8b08beda/driver/update-stop', async (c) => {
 })
 
 // Update multiple bus stops (driver edits route names)
-app.post('/make-server-8b08beda/driver/update-stops', async (c) => {
+app.post('/driver/update-stops', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -908,7 +955,7 @@ app.post('/make-server-8b08beda/driver/update-stops', async (c) => {
 })
 
 // Add a new route stop (driver adds route)
-app.post('/make-server-8b08beda/driver/add-route', async (c) => {
+app.post('/driver/add-route', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -966,7 +1013,7 @@ app.post('/make-server-8b08beda/driver/add-route', async (c) => {
 })
 
 // Get available bus list (public endpoint - no auth required)
-app.get('/make-server-8b08beda/buses/available', async (c) => {
+app.get('/buses/available', async (c) => {
   try {
     const buses = await initializeDefaultBuses()
     return c.json({ buses })
@@ -977,7 +1024,7 @@ app.get('/make-server-8b08beda/buses/available', async (c) => {
 })
 
 // Add new bus to the list (drivers only)
-app.post('/make-server-8b08beda/buses/add', async (c) => {
+app.post('/buses/add', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -1014,7 +1061,7 @@ app.post('/make-server-8b08beda/buses/add', async (c) => {
 })
 
 // AI Chatbot endpoint
-app.post('/make-server-8b08beda/chatbot', async (c) => {
+app.post('/chatbot', async (c) => {
   try {
     const { message } = await c.req.json()
     

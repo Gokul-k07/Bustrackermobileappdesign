@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -290,3 +290,4 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     </div>
   );
 }
+
