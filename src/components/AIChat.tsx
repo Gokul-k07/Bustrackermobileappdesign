@@ -49,7 +49,7 @@ export function AIChat() {
 
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-8b08beda/chatbot`,
+        `https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/chatbot`,
         {
           method: 'POST',
           headers: {

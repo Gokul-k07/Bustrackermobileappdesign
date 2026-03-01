@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { projectId } from '../utils/supabase/info';
 import { Play, Square, QrCode, Users, MapPin, Clock, Copy, Bus, Plus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -56,9 +57,12 @@ export function DriverDashboard({
       setAvailableBuses(buses);
       
       // Fetch all active bus locations to determine which buses are in use
-      const data = await apiClient.getBuses();
-      const activeBusNames = (data.buses || []).map((bus: any) => bus.route);
-      setBusesInUse(activeBusNames);
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/buses`);
+      if (response.ok) {
+        const data = await response.json();
+        const activeBusNames = data.buses.map((bus: any) => bus.route);
+        setBusesInUse(activeBusNames);
+      }
     } catch (error) {
       console.error('Failed to load buses:', error);
       toast.error('Failed to load bus list');

@@ -834,7 +834,8 @@ export function MapView({
               {busStops.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <Bus className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p>No route stops available</p>
+                  <p className="text-lg font-medium">No bus Routes are Provided</p>
+                  <p className="text-sm mt-2">Routes have not been configured for this bus yet.</p>
                   {canEditBus && (
                     <Button 
                       size="sm" 
@@ -1062,14 +1063,63 @@ export function MapView({
           </p>
           <div className="space-y-3">
             {/* Current User Location */}
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow"></div>
-                <span className="font-medium">Your Location</span>
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm ring-2 ring-green-100 ring-offset-0 animate-pulse"></div>
+                  <div className="absolute -inset-1 bg-green-400 rounded-full opacity-20 animate-ping"></div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-green-900">Your Location</span>
+                    {isLocationSharing && (
+                      <Badge variant="outline" className="h-5 px-1.5 py-0 bg-yellow-100 text-yellow-700 border-yellow-200 text-[9px] font-bold animate-bounce">
+                        +10 COINS
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-green-600 font-medium">
+                    {isLocationSharing ? 'Sharing live location' : 'Tracking current position'}
+                  </p>
+                </div>
               </div>
-              <span className="text-sm text-muted-foreground font-mono">
-                {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-xs font-mono text-green-700 bg-white/60 px-2 py-0.5 rounded border border-green-100 block">
+                    {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                  </span>
+                  <p className="text-[9px] text-green-500/70 mt-0.5">Swipe down to refresh</p>
+                </div>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8 text-green-600 hover:bg-green-100 rounded-full transition-all active:scale-90 active:rotate-180"
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      const toastId = toast.loading("Locating...");
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          const { latitude, longitude } = pos.coords;
+                          if (mapInstance.current) {
+                            mapInstance.current.setView([latitude, longitude], 16, { animate: true });
+                            toast.success("Location found and updated", { id: toastId });
+                          }
+                        },
+                        () => {
+                          toast.error("Location refresh failed, reloading page...", { id: toastId });
+                          setTimeout(() => window.location.reload(), 1500);
+                        },
+                        { enableHighAccuracy: true, timeout: 5000 }
+                      );
+                    } else {
+                      window.location.reload();
+                    }
+                  }}
+                  title="Refresh map and state"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Active + waiting buses */}
@@ -1134,4 +1184,3 @@ export function MapView({
     </div>
   );
 }
-

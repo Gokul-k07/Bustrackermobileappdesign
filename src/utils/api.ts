@@ -10,9 +10,32 @@ export interface ApiResponse<T = any> {
 
 class ApiClient {
   private accessToken: string | null = null;
+  private validKitKey = "vk_prod_931cac0aba91c7202eea55da";
 
   setAccessToken(token: string | null) {
     this.accessToken = token;
+  }
+
+  // Email validation using ValidKit
+  async validateEmail(email: string): Promise<{ valid: boolean; message?: string }> {
+    try {
+      const url = `https://api.validkit.com/v1/validate?email=${encodeURIComponent(email)}&api_key=${this.validKitKey}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.warn('ValidKit API error, skipping validation');
+        return { valid: true };
+      }
+      
+      const data = await response.json();
+      return { 
+        valid: data.valid, 
+        message: data.valid ? undefined : (data.reason || 'This email address appears to be invalid or disposable.')
+      };
+    } catch (error) {
+      console.error('ValidKit validation failed:', error);
+      return { valid: true }; // Fallback to true so users aren't blocked if API is down
+    }
   }
 
   private async request<T>(
@@ -29,6 +52,7 @@ class ApiClient {
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${this.accessToken || publicAnonKey}`,
+      'apikey': publicAnonKey, // Required by Supabase for functions
       ...options.headers,
     };
 
@@ -56,10 +80,13 @@ class ApiClient {
 
       return await response.json();
     } catch (error: any) {
-      // Only log meaningful errors, not auth errors during initial load
-      if (error.message && !error.message.includes('Invalid or expired token')) {
-        console.error(`API request failed for ${endpoint}:`, error.message);
+      // Log more detailed info for debugging
+      console.error(`Fetch error for ${url}:`, error.message);
+      
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Could not connect to the server. Please check your internet connection and try again.');
       }
+      
       throw error;
     }
   }

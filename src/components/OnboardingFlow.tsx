@@ -59,6 +59,14 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
     try {
       if (isSignUp) {
         if (formData.name.trim() && formData.email.trim() && formData.password.trim()) {
+          // Validate email with ValidKit first
+          const validation = await apiClient.validateEmail(formData.email);
+          if (!validation.valid) {
+            setError(validation.message || 'Please use a valid personal email address.');
+            setIsLoading(false);
+            return;
+          }
+          
           await onComplete(formData);
         }
       } else {

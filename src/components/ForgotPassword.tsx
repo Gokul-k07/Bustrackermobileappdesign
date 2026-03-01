@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { projectId } from '../utils/supabase/info';
 import { Mail, Lock, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -34,7 +35,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     setIsSending(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/send-reset-code`, {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/send-reset-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,7 +104,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     setIsResetting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/reset-password`, {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
