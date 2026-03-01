@@ -41,7 +41,7 @@ interface OpenRouteServiceGeoJsonResponse {
 }
 
 const OPENROUTES_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjdiMGNkYjk3ZTBhMDQ4MzA4N2MzNTA4YTFlNWFmMjUzIiwiaCI6Im11cm11cjY0In0=';
-const OPENROUTES_DIRECTIONS_URL = 'https://api.openrouteservice.org/v2/directions/driving-car/geojson';
+const OPENROUTES_DIRECTIONS_URL = 'https://api.openrouteservice.org/v2/directions/driving-car';
 
 function hashSeed(value: string) {
   let hash = 0;
