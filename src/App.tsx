@@ -164,8 +164,19 @@ export default function App() {
   };
 
   const requestLocationPermission = () => {
-    if ("geolocation" in navigator) {
+    // Check if the current environment supports geolocation
+    if (typeof navigator !== 'undefined' && "geolocation" in navigator) {
       try {
+        // First check the Permissions API if available
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(permissionStatus => {
+            if (permissionStatus.state === 'denied') {
+              console.warn('Geolocation permission was previously denied');
+              setLocationPermissionGranted(false);
+            }
+          }).catch(err => console.warn('Permissions API not supported or error:', err));
+        }
+
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setCurrentLocation({
@@ -200,45 +211,29 @@ export default function App() {
             console.warn('Geolocation error:', error.message || error.code);
             setLocationPermissionGranted(false);
             
-            // Only show toast when permission is actually denied or unavailable
-            if (error.message && error.message.includes('permissions policy')) {
-              toast.warning('Location access restricted', {
-                description: 'Location has been disabled by your browser or site settings. Using default location.',
+            // Provide helpful feedback for policy restrictions
+            if (error.code === 1) { // PERMISSION_DENIED
+              toast.error('Location Permission Denied', {
+                description: 'Please enable location services in your browser settings to use live tracking.',
                 duration: 5000
               });
-            } else if (error.code === 1) { // PERMISSION_DENIED
-              toast.info('Location Permission Required', {
-                description: 'Please allow location access to see your current position on the map and share your location with drivers',
-                duration: 5000
-              });
-            } else if (error.code === 2) { // POSITION_UNAVAILABLE
-              toast.warning('Location unavailable', {
-                description: 'Unable to determine your location. Using default location.'
-              });
-            } else if (error.code === 3) { // TIMEOUT
-              toast.warning('Location request timed out', {
-                description: 'Please check your device location settings'
-              });
+            } else if (error.message && error.message.includes('permissions policy')) {
+              console.error('Permission policy blocks geolocation');
+              // This is often due to iframe restrictions or cross-origin issues
             }
           },
           {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 300000
+            enableHighAccuracy: false, // Use lower accuracy for initial check to avoid some policy blocks
+            timeout: 5000,
+            maximumAge: Infinity
           }
         );
       } catch (err: any) {
         console.warn('Geolocation initialization error:', err);
         setLocationPermissionGranted(false);
-        toast.warning('Location access restricted', {
-          description: 'Location services are not available. Using default location.',
-          duration: 5000
-        });
       }
     } else {
-      toast.info('Geolocation not supported', {
-        description: 'Your browser or device does not support location services. Using default location.'
-      });
+      console.warn('Geolocation not supported by this browser');
     }
   };
 
@@ -686,10 +681,14 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Bus className="h-12 w-12 text-primary mx-auto mb-4 animate-bounce" />
-          <p>Loading BusTracker...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center p-8 bg-card rounded-xl shadow-lg border">
+          <Bus className="h-16 w-16 text-primary mx-auto mb-4 animate-bounce" />
+          <h2 className="text-2xl font-bold mb-2">BusTracker</h2>
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Connecting to services...</p>
+          </div>
         </div>
       </div>
     );

@@ -4,7 +4,7 @@ import { logger } from 'npm:hono/logger'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as kv from './kv_store.tsx'
 
-const app = new Hono()
+const app = new Hono().basePath('/functions/v1/server')
 
 // Middleware
 app.use('*', cors({
@@ -83,7 +83,7 @@ const DEFAULT_BUS_ROUTES = {
 "PSNA-74": ["PATTIVEERAN PATTY", "ANNA NAGAR", "SAVADI", "RADIO POTTAL", "GANDHI PURAM", "THEVARAN PATTY PIRIVU", "VEPPAMARAM", "ARASAMARAM", "GANESHAPURAM", "AATHUR TALUK OFFICE", "AATHUR BUS STAND", "S PARAI PATTY", "DHARUMATHUPATTY", "KANNIVADI", "AALATHURAN PATTY", "PUDHUPATTY", "REDDIYAR CHATRAM", "PSNACET"],
 "PSNA-30": ["MURUGABHAVANAM", "AYYANGULAM", "SAKTHI TALKIES", "AARIYABHAVAN", "VANI VILAS", "JEGANATH HOSPITAL", "SONA TOWER", "AMMA MESS", "12TH CROSS", "9TH CROSS", "8TH CROSS", "7TH CROSS", "WATER TANK", "4TH CROSS", "MVM COLLEGE", "ANJALI BYE PASS", "PSNACET"],
 "PSNA-20": ["ATHIKARIPATTI", "SILUVATHUR", "PUGAIYELAIPATTI PIRIVU", "PANNAI PATTY PIRIVU", "RAJAKKA PATTY", "M.M.KOVILUR PIRIVU (2)", "SOUNDRARAJA AIRPORT", "UTHANAMPATTY PRIVU", "BALAKRISHNAPURAM", "SMBM SCHOOL", "PSNACET"],
-"PSNA-23/22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTI", "PONNAGARAM", "ITI", "PSNACET"],
+"PSNA-23/22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTY", "PONNAGARAM", "ITI", "PSNACET"],
 "PSNA-28": ["VADIPATTI", "VADIPATTI CHURCH", "PANDIYARAJAPURAM PRIVU", "PALLAPATTI PRIVU", "AMMAYANAYAKKANUR", "KODAIROAD", "TOLL GATE", "KOZHINJIPATTI PIRIVU", "KAMALAPURAM", "AMBATHURAI", "AANGANEYAR KOVIL", "PSNACET"],
 "PSNA-29": ["BALAKRISHNAPURAM", "SMBM SCHOOL", "SP OFFICE", "DGL SCAN", "DGL BUS STAND", "DGL G.H", "AARIYABHAVAN", "PALANI BYE.PASS", "PSNACET"],
 "PSNA-31/56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
@@ -101,7 +101,15 @@ async function getDefaultRoutesForBus(busName: string) {
     return customRoutes
   }
   
-  // Return default routes if available
+  // Only return default routes if the bus is registered in available buses
+  const availableBuses = await kv.get('available_buses') || []
+  
+  // If bus is not in available buses list, return empty array
+  if (!availableBuses.includes(busName)) {
+    return []
+  }
+  
+  // Return default routes if available for this registered bus
   if (DEFAULT_BUS_ROUTES[busName]) {
     const routes = DEFAULT_BUS_ROUTES[busName].map((name, index) => ({
       id: `${busName}_stop_${index + 1}`,
@@ -118,12 +126,12 @@ async function getDefaultRoutesForBus(busName: string) {
 }
 
 // Routes
-app.get('/make-server-8b08beda/health', (c) => {
+app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 // User registration
-app.post('/make-server-8b08beda/register', async (c) => {
+app.post('/register', async (c) => {
   try {
     const { name, email, password, role } = await c.req.json()
     
@@ -182,7 +190,7 @@ app.post('/make-server-8b08beda/register', async (c) => {
 })
 
 // Send password reset code
-app.post('/make-server-8b08beda/send-reset-code', async (c) => {
+app.post('/send-reset-code', async (c) => {
   try {
     const { email } = await c.req.json()
     
@@ -276,7 +284,7 @@ app.post('/make-server-8b08beda/send-reset-code', async (c) => {
 })
 
 // Reset password with verification code
-app.post('/make-server-8b08beda/reset-password', async (c) => {
+app.post('/reset-password', async (c) => {
   try {
     const { email, code, newPassword } = await c.req.json()
     
@@ -328,7 +336,7 @@ app.post('/make-server-8b08beda/reset-password', async (c) => {
 })
 
 // Get user profile
-app.get('/make-server-8b08beda/profile', async (c) => {
+app.get('/profile', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -348,7 +356,7 @@ app.get('/make-server-8b08beda/profile', async (c) => {
 })
 
 // Update user coins
-app.post('/make-server-8b08beda/update-coins', async (c) => {
+app.post('/update-coins', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -381,7 +389,7 @@ app.post('/make-server-8b08beda/update-coins', async (c) => {
 })
 
 // Driver goes online/offline
-app.post('/make-server-8b08beda/driver/status', async (c) => {
+app.post('/driver/status', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -493,7 +501,7 @@ app.post('/make-server-8b08beda/driver/status', async (c) => {
 })
 
 // Generate OTP
-app.post('/make-server-8b08beda/driver/generate-otp', async (c) => {
+app.post('/driver/generate-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -527,7 +535,7 @@ app.post('/make-server-8b08beda/driver/generate-otp', async (c) => {
 })
 
 // Get driver's active OTPs
-app.get('/make-server-8b08beda/driver/otps', async (c) => {
+app.get('/driver/otps', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -547,7 +555,7 @@ app.get('/make-server-8b08beda/driver/otps', async (c) => {
 })
 
 // Validate OTP and start location sharing (passenger acts as driver)
-app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
+app.post('/passenger/share-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -646,7 +654,7 @@ app.post('/make-server-8b08beda/passenger/share-location', async (c) => {
 })
 
 // Stop location sharing (passenger or driver can stop)
-app.post('/make-server-8b08beda/passenger/stop-sharing', async (c) => {
+app.post('/passenger/stop-sharing', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -683,7 +691,7 @@ app.post('/make-server-8b08beda/passenger/stop-sharing', async (c) => {
 })
 
 // Stop OTP (Driver can revoke an OTP)
-app.post('/make-server-8b08beda/driver/stop-otp', async (c) => {
+app.post('/driver/stop-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -716,7 +724,7 @@ app.post('/make-server-8b08beda/driver/stop-otp', async (c) => {
 })
 
 // Get all active buses for passengers
-app.get('/make-server-8b08beda/buses', async (c) => {
+app.get('/buses', async (c) => {
   try {
     const buses = await kv.getByPrefix('bus:')
     const activeBuses = buses.filter(bus => bus.isOnline)
@@ -729,7 +737,7 @@ app.get('/make-server-8b08beda/buses', async (c) => {
 })
 
 // Get active location shares for a driver
-app.get('/make-server-8b08beda/driver/location-shares', async (c) => {
+app.get('/driver/location-shares', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -749,7 +757,7 @@ app.get('/make-server-8b08beda/driver/location-shares', async (c) => {
 })
 
 // Update passenger location (for active sharing - passenger acting as driver)
-app.post('/make-server-8b08beda/passenger/update-location', async (c) => {
+app.post('/passenger/update-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -816,7 +824,7 @@ app.post('/make-server-8b08beda/passenger/update-location', async (c) => {
 })
 
 // Get bus stops for a specific bus
-app.get('/make-server-8b08beda/bus/:busId/stops', async (c) => {
+app.get('/bus/:busId/stops', async (c) => {
   try {
     const busId = c.req.param('busId')
     const busData = await kv.get(`bus:${busId}`)
@@ -839,7 +847,7 @@ app.get('/make-server-8b08beda/bus/:busId/stops', async (c) => {
 })
 
 // Update bus stop status (driver marks stop as passed)
-app.post('/make-server-8b08beda/driver/update-stop', async (c) => {
+app.post('/driver/update-stop', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -873,7 +881,7 @@ app.post('/make-server-8b08beda/driver/update-stop', async (c) => {
 })
 
 // Update multiple bus stops (driver edits route names)
-app.post('/make-server-8b08beda/driver/update-stops', async (c) => {
+app.post('/driver/update-stops', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -908,7 +916,7 @@ app.post('/make-server-8b08beda/driver/update-stops', async (c) => {
 })
 
 // Add a new route stop (driver adds route)
-app.post('/make-server-8b08beda/driver/add-route', async (c) => {
+app.post('/driver/add-route', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -966,7 +974,7 @@ app.post('/make-server-8b08beda/driver/add-route', async (c) => {
 })
 
 // Get available bus list (public endpoint - no auth required)
-app.get('/make-server-8b08beda/buses/available', async (c) => {
+app.get('/buses/available', async (c) => {
   try {
     const buses = await initializeDefaultBuses()
     return c.json({ buses })
@@ -977,7 +985,7 @@ app.get('/make-server-8b08beda/buses/available', async (c) => {
 })
 
 // Add new bus to the list (drivers only)
-app.post('/make-server-8b08beda/buses/add', async (c) => {
+app.post('/buses/add', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -1014,7 +1022,7 @@ app.post('/make-server-8b08beda/buses/add', async (c) => {
 })
 
 // AI Chatbot endpoint
-app.post('/make-server-8b08beda/chatbot', async (c) => {
+app.post('/chatbot', async (c) => {
   try {
     const { message } = await c.req.json()
     
@@ -1032,41 +1040,71 @@ app.post('/make-server-8b08beda/chatbot', async (c) => {
 
     let response = ''
 
-    // Check for specific bus route query
-    const busMatch = lowerMessage.match(/psna[-\s]?(\d+|[\d\/]+)/i)
-    if (busMatch) {
-      const busNumber = busMatch[1]
-      const busName = `PSNA-${busNumber}`
-      
-      const busRoute = DEFAULT_BUS_ROUTES[busName]
-      if (busRoute) {
-        response = `📍 **Routes for ${busName}**\n\n${busRoute.map((stop, i) => `${i + 1}. ${stop}`).join('\n')}\n\n✅ Total stops: ${busRoute.length}`
-      } else {
-        response = `❌ Sorry, I don't have route information for ${busName}. This bus may not be in our system.`
-      }
+  // Check for specific bus route query
+  const busMatch = lowerMessage.match(/psna[-\s]?(\d+|[\d\/]+)/i) || lowerMessage.match(/bus[-\s]?(\d+|[\d\/]+)/i)
+  if (busMatch) {
+    let busNumber = busMatch[1]
+    // Standardize bus number format
+    let busName = `PSNA-${busNumber}`
+    
+    if (!DEFAULT_BUS_ROUTES[busName]) {
+      const foundBus = availableBuses.find(b => b.includes(busNumber))
+      if (foundBus) busName = foundBus
     }
-    // How many buses online/offline
-    else if (lowerMessage.includes('online') || lowerMessage.includes('offline')) {
-      response = `🚌 **Bus Status**\n\n✅ Online: ${onlineBuses.length} buses\n⏸️ Offline: ${offlineBuses} buses\n📊 Total buses in app: ${availableBuses.length}\n\n${onlineBuses.length > 0 ? `Currently online buses:\n${onlineBuses.map(bus => `• ${bus.route}`).join('\n')}` : 'No buses are currently online.'}`
+    
+    const busRoute = DEFAULT_BUS_ROUTES[busName]
+    if (busRoute) {
+      response = `📍 **Routes for ${busName}**\n\n${busRoute.map((stop, i) => `${i + 1}. ${stop}`).join('\n')}\n\n✅ Total stops: ${busRoute.length}`
+    } else {
+      response = `❌ Sorry, I don't have route information for ${busName}. This bus may not be in our system.\n\nAvailable routes: ${availableBuses.slice(0, 5).join(', ')}...`
     }
-    // How many buses in app
-    else if (lowerMessage.includes('how many') && lowerMessage.includes('bus')) {
-      response = `📊 **Total Buses in App**: ${availableBuses.length}\n\n✅ Currently online: ${onlineBuses.length}\n⏸️ Currently offline: ${offlineBuses}\n\nAvailable buses:\n${availableBuses.slice(0, 10).join(', ')}${availableBuses.length > 10 ? ` ...and ${availableBuses.length - 10} more` : ''}`
-    }
-    // List all buses
-    else if (lowerMessage.includes('list') && lowerMessage.includes('bus')) {
-      response = `🚌 **All Available Buses**:\n\n${availableBuses.join(', ')}\n\n📊 Total: ${availableBuses.length} buses`
-    }
-    else if (lowerMessage.includes('owner') && lowerMessage.includes('app')) {
-      response = `🚌 **GOKUL K**:\n His mail id is gokulk24cb@psnacet.edu.in`
-    }
-    else if (lowerMessage.includes('psna') && lowerMessage.includes('details')) {
-      response = `🚌 **PSNACET BUSES**:\n visit psnacet offcial website.`
-    }
-    // Help/default response
-    else {
-      response = `👋 **Hi! I'm your BusTracker AI Assistant**\n\nI can help you with:\n\n🔹 **Bus Routes**: Ask "Tell me the routes of bus PSNA-30"\n🔹 **Bus Status**: Ask "How many buses are online?"\n🔹 **Bus Count**: Ask "How many buses in app?"\n🔹 **List Buses**: Ask "List all buses"\n\nWhat would you like to know?`
-    }
+  }
+  // Detailed explanation of specific features
+  else if (lowerMessage.includes('how to use') || lowerMessage.includes('instructions')) {
+    response = `📖 **How to Use BusTracker**\n\n1. **Drivers**: Click "Start Trip" to share your location and earn 10 coins. Generate OTPs for passengers.\n2. **Passengers**: View live buses on the map. Click a bus to see its stops. Use an OTP to share your own location and earn coins.\n3. **Map**: Click icons to see distance/time info. Swipe down to refresh.`
+  }
+  // Real-time details
+  else if (lowerMessage.includes('time') || lowerMessage.includes('far') || lowerMessage.includes('distance')) {
+    response = `⏱️ **Time & Distance**\n\nWhen you select a bus on the map, I calculate the distance and estimated time of arrival based on real-time traffic and road routing. Check the bottom bar when a bus is selected!`
+  }
+  // Greetings
+  else if (lowerMessage.match(/\b(hi|hello|hey|greetings|yo)\b/)) {
+    response = `👋 **Hi there! I'm your BusTracker AI Assistant.**\n\nI can tell you about bus routes, live status, or how the coin system works. What's on your mind?`
+  }
+  // How many buses online/offline
+  else if (lowerMessage.includes('online') || lowerMessage.includes('live') || lowerMessage.includes('tracking')) {
+    response = `🚌 **Bus Status**\n\n✅ Online: ${onlineBuses.length} buses\n⏸️ Offline: ${offlineBuses} buses\n📊 Total registered: ${availableBuses.length}\n\n${onlineBuses.length > 0 ? `Currently online:\n${onlineBuses.map(bus => `• **${bus.route}** (Driver: ${bus.driverName})`).join('\n')}` : 'No buses are currently online.'}`
+  }
+  // How many buses in app
+  else if (lowerMessage.includes('how many') && (lowerMessage.includes('bus') || lowerMessage.includes('total'))) {
+    response = `📊 **Total Buses in App**: ${availableBuses.length}\n\n✅ Online: ${onlineBuses.length}\n⏸️ Offline: ${offlineBuses}\n\nCommon buses:\n${availableBuses.slice(0, 8).join(', ')}...`
+  }
+  // Coin related
+  else if (lowerMessage.includes('coin') || lowerMessage.includes('earn') || lowerMessage.includes('pay') || lowerMessage.includes('money')) {
+    response = `💰 **Coins & Rewards**\n\n• **Earn**: You get **10 coins** every time you share your location (as a driver or via OTP).\n• **Share**: It costs **10 coins** to request location sharing via OTP.\n• **Purpose**: This ensures high-quality, verified location data for all users!`
+  }
+  // Roles related
+  else if (lowerMessage.includes('driver') || lowerMessage.includes('passenger') || lowerMessage.includes('role') || lowerMessage.includes('account')) {
+    response = `👥 **Account Roles**\n\n• **Drivers**: Manage the bus, update stops, and generate codes.\n• **Passengers**: Monitor buses, check ETA, and provide location feedback.\n\nYou select your role during signup!`
+  }
+  // List all buses
+  else if (lowerMessage.includes('list') || lowerMessage.includes('all buses') || lowerMessage.includes('show buses')) {
+    response = `🚌 **Available Buses**:\n\n${availableBuses.join(', ')}\n\n📊 Total: ${availableBuses.length} buses`
+  }
+  else if (lowerMessage.includes('owner') || lowerMessage.includes('creator') || lowerMessage.includes('who made') || lowerMessage.includes('developer')) {
+    response = `👨‍💻 **Developer Profile**\n\n**GOKUL K**\nRole: Application Developer\n📧 Email: gokulk24cb@psnacet.edu.in\n\nThis app was built to help PSNACET students track college buses efficiently.`
+  }
+  else if (lowerMessage.includes('contact') || lowerMessage.includes('support') || lowerMessage.includes('help') || lowerMessage.includes('problem')) {
+    response = `ℹ️ **Support**\n\n• **Tech Issues**: Email **gokulk24cb@psnacet.edu.in**\n• **Official Info**: Visit the **PSNACET website**.\n• **Routes**: Ask me "Where is PSNA-30?"`
+  }
+  // Feedback
+  else if (lowerMessage.includes('feedback') || lowerMessage.includes('suggest') || lowerMessage.includes('report')) {
+    response = `📝 **Feedback**\n\nYou can submit feedback through the **Profile** tab. Click "Feedback & Support" to open your mail app with pre-filled technical details.`
+  }
+  // Default response
+  else {
+    response = `👋 **Hi! I'm your BusTracker AI Assistant**\n\nI didn't quite understand that. Try asking:\n\n📍 "What is the route for PSNA-30?"\n📡 "Which buses are currently online?"\n💰 "How do I earn 10 coins?"\n👥 "Who developed this app?"`
+  }
 
     return c.json({ 
       success: true, 
