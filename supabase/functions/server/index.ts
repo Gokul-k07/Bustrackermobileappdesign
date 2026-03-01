@@ -157,12 +157,10 @@ function hasShareExpired(expiresAt?: string | null) {
 
 // Routes
 app.get('/health', (c) => {
-app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 // User registration
-app.post('/register', async (c) => {
 app.post('/register', async (c) => {
   try {
     const { name, email, password, role } = await c.req.json()
@@ -222,7 +220,6 @@ app.post('/register', async (c) => {
 })
 
 // Send password reset code
-app.post('/send-reset-code', async (c) => {
 app.post('/send-reset-code', async (c) => {
   try {
     const { email } = await c.req.json()
@@ -317,7 +314,6 @@ app.post('/send-reset-code', async (c) => {
 })
 
 // Reset password with verification code
-app.post('/reset-password', async (c) => {
 app.post('/reset-password', async (c) => {
   try {
     const { email, code, newPassword } = await c.req.json()
@@ -425,7 +421,6 @@ app.get('/make-server-8b08beda/profile', handleGetProfile)
 
 // Update user coins
 app.post('/update-coins', async (c) => {
-app.post('/update-coins', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -458,7 +453,6 @@ app.post('/update-coins', async (c) => {
 })
 
 // Driver goes online/offline
-app.post('/driver/status', async (c) => {
 app.post('/driver/status', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
@@ -589,7 +583,6 @@ app.post('/driver/status', async (c) => {
 
 // Generate OTP
 app.post('/driver/generate-otp', async (c) => {
-app.post('/driver/generate-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -646,7 +639,6 @@ app.get('/driver/otps', handleGetDriverOtps)
 app.get('/make-server-8b08beda/driver/otps', handleGetDriverOtps)
 
 // Validate OTP and start location sharing (passenger acts as driver)
-app.post('/passenger/share-location', async (c) => {
 app.post('/passenger/share-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
@@ -846,7 +838,6 @@ app.post('/passenger/pause-sharing', async (c) => {
 
 // Stop OTP (Driver can revoke an OTP)
 app.post('/driver/stop-otp', async (c) => {
-app.post('/driver/stop-otp', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -973,7 +964,6 @@ app.get('/make-server-8b08beda/driver/location-shares', handleGetDriverLocationS
 
 // Update passenger location (for active sharing - passenger acting as driver)
 app.post('/passenger/update-location', async (c) => {
-app.post('/passenger/update-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -1051,7 +1041,6 @@ app.post('/passenger/update-location', async (c) => {
 
 // Get bus stops for a specific bus
 app.get('/bus/:busId/stops', async (c) => {
-app.get('/bus/:busId/stops', async (c) => {
   try {
     const busId = c.req.param('busId')
     const rawBusData = await kv.get(`bus:${busId}`)
@@ -1084,7 +1073,6 @@ app.get('/bus/:busId/stops', async (c) => {
 })
 
 // Update bus stop status (driver marks stop as passed)
-app.post('/driver/update-stop', async (c) => {
 app.post('/driver/update-stop', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
@@ -1146,7 +1134,6 @@ app.post('/driver/update-stop', async (c) => {
 
 // Update multiple bus stops (driver edits route names)
 app.post('/driver/update-stops', async (c) => {
-app.post('/driver/update-stops', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -1191,7 +1178,6 @@ app.post('/driver/update-stops', async (c) => {
 })
 
 // Add a new route stop (driver adds route)
-app.post('/driver/add-route', async (c) => {
 app.post('/driver/add-route', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
@@ -1275,7 +1261,6 @@ app.get('/make-server-8b08beda/buses/available', handleGetAvailableBuses)
 
 // Add new bus to the list (drivers only)
 app.post('/buses/add', async (c) => {
-app.post('/buses/add', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -1312,7 +1297,6 @@ app.post('/buses/add', async (c) => {
 })
 
 // AI Chatbot endpoint
-app.post('/chatbot', async (c) => {
 app.post('/chatbot', async (c) => {
   try {
     const { message } = await c.req.json()
