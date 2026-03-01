@@ -39,7 +39,7 @@ async function authenticateRequest(request: Request) {
 async function initializeDefaultBuses() {
   const existingBuses = await kv.get('available_buses')
   if (!existingBuses) {
-    const defaultBusNumbers = [30, 29, 31, 56, 36, 35, 32, 69, 73, 72, 74, 20, 23, 22, 28, 25, 26, 27, 45, 47, 38, 51, 34, 33, 39, 53, 54, 44, 40, 59, 42, 43, 46, 57, 48, 49, 52, 41, 55, 50, 58, 60, 61]
+    const defaultBusNumbers = [30, 29, "31/56", 36, 35, 32, 69, 73, 72, 74, 20, "23/22", 28, 25, 26, 27, 45, 47, 38, 51, 34, "33/39", 53, 54, 44, 40, 59, 42, 43, 46, 57, 48, 49, 52, 41, 55, 50, 58, 60, 61]
     const buses = defaultBusNumbers.map(num => `PSNA-${num}`)
     await kv.set('available_buses', buses)
     return buses
@@ -58,7 +58,7 @@ const DEFAULT_BUS_ROUTES = {
 "PSNA-38": ["BATALAGUNDU BUS STAND", "POLICE STATION", "KALIAMMAN KOVIL", "KATTASPATHIRI", "INDIAN OIL", "STATE BANK COLONY", "A.PRIVU", "LAKSHMI PURAM", "PSNACET"],
 "PSNA-51": ["GURU THEATRE", "THEEKKATHIR", "FATHIMA COLLEGE", "KARISAL KULAM", "VILANGUDI", "VISTHARA APARTMENT", "MADHURAI RADHA", "PARAVAI", "POWER HOUSE", "SAMAYANALLUR", "AYYAMKOΟΤΑΙ", "PSNACET"],
 "PSNA-34": ["PERIYAKULAM BHARATHIPURAM", "PERIYAKULAM GANDHI STATUE", "JAYA THEATRE", "RMTC SET", "DEVATHANAPATTY", "KOVILPATTY", "GATT ROAD", "SENGULAM PIRIVU", "MEENATCHIPURAM", "OLD BATTALAGUNDU", "MEENATCHI HOTEL", "MUTHALAPURAM", "OTTUPPATTY", "SALAI PUDUR", "SITHAYANKOTTAI PIRIVU", "PSNACET"],
-"PSNA-33": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
+"PSNA-33/39": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
 "PSNA-53": ["VIRAGANOOR RING ROAD", "ILANALLU R (VIRAGANOOR)", "NIRMALA SCHOOL", "SANTHA PETTAI", "ICICI BANK", "ALANGAR THEATRE", "KEELAVASAAL", "PSNACET"],
 "PSNA-54": ["SIMMAKKAL", "THAMILSANGAM ROAD(BELL HOTEL)", "MADURA COATS", "JAIL ROAD", "MATHI THEATRE", "AGARWAL HOSPITAL-AARAPALAYAM", "PSNACET"],
 "PSNA-44": ["KADACHANENTHAL", "SURYA NAGAR", "SERVEYER COLONY", "MOONDRU MAVADI", "ALAGAR NAGAR", "K PUDUR", "I.T. STOP", "THAMARAI THOTTI", "OUT POST", "THALLAKULAM", "THAMUKKAM", "GORIPALAYAM", "PSNACET"],
@@ -83,16 +83,13 @@ const DEFAULT_BUS_ROUTES = {
 "PSNA-74": ["PATTIVEERAN PATTY", "ANNA NAGAR", "SAVADI", "RADIO POTTAL", "GANDHI PURAM", "THEVARAN PATTY PIRIVU", "VEPPAMARAM", "ARASAMARAM", "GANESHAPURAM", "AATHUR TALUK OFFICE", "AATHUR BUS STAND", "S PARAI PATTY", "DHARUMATHUPATTY", "KANNIVADI", "AALATHURAN PATTY", "PUDHUPATTY", "REDDIYAR CHATRAM", "PSNACET"],
 "PSNA-30": ["MURUGABHAVANAM", "AYYANGULAM", "SAKTHI TALKIES", "AARIYABHAVAN", "VANI VILAS", "JEGANATH HOSPITAL", "SONA TOWER", "AMMA MESS", "12TH CROSS", "9TH CROSS", "8TH CROSS", "7TH CROSS", "WATER TANK", "4TH CROSS", "MVM COLLEGE", "ANJALI BYE PASS", "PSNACET"],
 "PSNA-20": ["ATHIKARIPATTI", "SILUVATHUR", "PUGAIYELAIPATTI PIRIVU", "PANNAI PATTY PIRIVU", "RAJAKKA PATTY", "M.M.KOVILUR PIRIVU (2)", "SOUNDRARAJA AIRPORT", "UTHANAMPATTY PRIVU", "BALAKRISHNAPURAM", "SMBM SCHOOL", "PSNACET"],
-"PSNA-23": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTI", "PONNAGARAM", "ITI", "PSNACET"],
+"PSNA-23/22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTY", "PONNAGARAM", "ITI", "PSNACET"],
 "PSNA-28": ["VADIPATTI", "VADIPATTI CHURCH", "PANDIYARAJAPURAM PRIVU", "PALLAPATTI PRIVU", "AMMAYANAYAKKANUR", "KODAIROAD", "TOLL GATE", "KOZHINJIPATTI PIRIVU", "KAMALAPURAM", "AMBATHURAI", "AANGANEYAR KOVIL", "PSNACET"],
 "PSNA-29": ["BALAKRISHNAPURAM", "SMBM SCHOOL", "SP OFFICE", "DGL SCAN", "DGL BUS STAND", "DGL G.H", "AARIYABHAVAN", "PALANI BYE.PASS", "PSNACET"],
-"PSNA-31": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
+"PSNA-31/56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
 "PSNA-36": ["CHINNALAPATTY", "POONCHOLAI", "CHINNALAPATTY PIRIVU", "KEELAKOTTAI BYE-PASS", "CHETTIYAPATTY PIRIVU", "KALIKAM PATTY PIRIVU", "POKUVARATHU NAGAR", "VELLODU PIRIVU", "PANJAM PATTY PIRIVU (EAST)", "COFFEE SHOP", "ANNAMALAYAR MILL", "THOMAYARPURAM", "PSNACET"],
 "PSNA-35": ["SMBM SCHOOL", "SP OFFICE", "SP OFFICE", "DGL BUS STAND", "AARIYABHAVAN", "VANI VILAS SIGNAL", "PALANI BYE-PASS", "PSNACET"],
-"PSNA-32": ["MA.MU.KOVILUR PIRIVU", "SEELAPADI BYE.PASS", "NGA MILL", "NGO COLONY", "UZAVAR SANTHAI", "CITY HOSPITAL", "PSNACET"],
-"PSNA-56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
-"PSNA-22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTI", "PONNAGARAM", "ITI", "PSNACET"],
-"PSNA-39": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"]
+"PSNA-32": ["MA.MU.KOVILUR PIRIVU", "SEELAPADI BYE.PASS", "NGA MILL", "NGO COLONY", "UZAVAR SANTHAI", "CITY HOSPITAL", "PSNACET"]
 
 }
 
@@ -126,33 +123,6 @@ async function getDefaultRoutesForBus(busName: string) {
   }
   
   return []
-}
-
-function withRouteOwnershipMetadata(busData: any, busId: string, options?: { driverId?: string; sharedByUserId?: string | null }) {
-  return {
-    ...busData,
-    routeId: busData?.routeId || busId,
-    driverId: options?.driverId || busData?.driverId || busId,
-    sharedByUserId: options?.sharedByUserId ?? busData?.sharedByUserId
-  }
-}
-
-function buildRouteEnvelope(busData: any, busId: string) {
-  const stops = Array.isArray(busData?.busStops) ? busData.busStops : []
-  return {
-    routeId: busData?.routeId || busId,
-    driverId: busData?.driverId || busId,
-    sharedByUserId: busData?.sharedByUserId || null,
-    stops,
-    passedStops: stops.filter((stop: any) => stop?.passed).map((stop: any) => stop.id)
-  }
-}
-
-function hasShareExpired(expiresAt?: string | null) {
-  if (!expiresAt) return false
-  const expiryTime = new Date(expiresAt).getTime()
-  if (Number.isNaN(expiryTime)) return false
-  return expiryTime <= Date.now()
 }
 
 // Routes
@@ -365,59 +335,25 @@ app.post('/reset-password', async (c) => {
   }
 })
 
-// Shared handler to avoid path-mismatch 404s for profile in different runtimes.
-const handleGetProfile = async (c: any) => {
+// Get user profile
+app.get('/profile', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
   }
 
   try {
-    let userData = await kv.get(`user:${user.id}`)
+    const userData = await kv.get(`user:${user.id}`)
     if (!userData) {
-      const roleFromAuth = user.user_metadata?.role === 'driver' ? 'driver' : 'passenger'
-      const fallbackProfile = {
-        id: user.id,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-        email: user.email || '',
-        role: roleFromAuth,
-        coins: roleFromAuth === 'passenger' ? 50 : 0,
-        createdAt: new Date().toISOString()
-      }
-
-      await kv.set(`user:${user.id}`, fallbackProfile)
-      if (roleFromAuth === 'driver') {
-        const existingDriverData = await kv.get(`driver:${user.id}`)
-        if (!existingDriverData) {
-          await kv.set(`driver:${user.id}`, {
-            isOnline: false,
-            route: '',
-            currentLocation: null,
-            lastUpdated: new Date().toISOString()
-          })
-        }
-      }
-
-      userData = fallbackProfile
+      return c.json({ error: 'User profile not found' }, 404)
     }
 
-    const passengerLink = await kv.get(`passenger:${user.id}`)
-    return c.json({
-      user: {
-        ...userData,
-        linkedDriverId: passengerLink?.linkedDriverId || null
-      }
-    })
+    return c.json({ user: userData })
   } catch (error) {
     console.log('Profile fetch error:', error)
     return c.json({ error: 'Failed to fetch user profile' }, 500)
   }
-}
-
-// Get user profile
-app.get('/profile', handleGetProfile)
-app.get('/profile/', handleGetProfile)
-app.get('/make-server-8b08beda/profile', handleGetProfile)
+})
 
 // Update user coins
 app.post('/update-coins', async (c) => {
@@ -530,48 +466,31 @@ app.post('/driver/status', async (c) => {
       }
     }
 
-    // Store in bus locations for map visibility
+    // Store in bus locations for passengers to see
     if (isOnline && location && busName) {
-      const freshUserData = await kv.get(`user:${user.id}`)
-      const existingBusData = await kv.get(`bus:${user.id}`)
-      let busStops =
-        existingBusData?.route === busName
-          ? (existingBusData?.busStops || [])
-          : []
+      const userData = await kv.get(`user:${user.id}`)
+      
+      // Create sample bus stops for demonstration
+      const busStops = [
+        { id: `${user.id}_stop_1`, name: 'Main Station', lat: location.lat + 0.001, lng: location.lng + 0.001, order: 1, passed: false },
+        { id: `${user.id}_stop_2`, name: 'Central Plaza', lat: location.lat + 0.002, lng: location.lng + 0.002, order: 2, passed: false },
+        { id: `${user.id}_stop_3`, name: 'Shopping Mall', lat: location.lat + 0.003, lng: location.lng + 0.003, order: 3, passed: false },
+        { id: `${user.id}_stop_4`, name: 'University', lat: location.lat + 0.004, lng: location.lng + 0.004, order: 4, passed: false },
+        { id: `${user.id}_stop_5`, name: 'Hospital', lat: location.lat + 0.005, lng: location.lng + 0.005, order: 5, passed: false },
+      ]
 
-      if (!Array.isArray(busStops) || busStops.length === 0) {
-        busStops = await getDefaultRoutesForBus(busName)
-      }
-
-      const busRecord = withRouteOwnershipMetadata({
+      await kv.set(`bus:${user.id}`, {
         id: user.id,
-        driverName: freshUserData?.name || 'Unknown Driver',
+        driverName: userData?.name || 'Unknown Driver',
         route: busName,
         lat: location.lat,
         lng: location.lng,
         isOnline: true,
         lastUpdated: new Date().toISOString(),
-        expiresAt: null,
-        busStops: busStops,
-        tripStartTime: existingBusData?.tripStartTime || new Date().toISOString(),
-        previousLocations: existingBusData?.previousLocations || []
-      }, user.id, { driverId: user.id, sharedByUserId: null })
-
-      await kv.set(`bus:${user.id}`, busRecord)
+        busStops: busStops
+      })
     } else {
-      // Mark bus as offline but keep last known location for 3 hours
-      const existingBus = await kv.get(`bus:${user.id}`)
-      if (existingBus) {
-        const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
-        await kv.set(
-          `bus:${user.id}`,
-          withRouteOwnershipMetadata(
-            { ...existingBus, isOnline: false, expiresAt, lastUpdated: new Date().toISOString() },
-            user.id,
-            { driverId: existingBus?.driverId || user.id }
-          )
-        )
-      }
+      await kv.del(`bus:${user.id}`)
     }
 
     return c.json({ success: true, status: driverData })
@@ -616,7 +535,7 @@ app.post('/driver/generate-otp', async (c) => {
 })
 
 // Get driver's active OTPs
-const handleGetDriverOtps = async (c: any) => {
+app.get('/driver/otps', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -633,10 +552,7 @@ const handleGetDriverOtps = async (c: any) => {
     console.log('OTP fetch error:', error)
     return c.json({ error: 'Failed to fetch OTPs' }, 500)
   }
-}
-
-app.get('/driver/otps', handleGetDriverOtps)
-app.get('/make-server-8b08beda/driver/otps', handleGetDriverOtps)
+})
 
 // Validate OTP and start location sharing (passenger acts as driver)
 app.post('/passenger/share-location', async (c) => {
@@ -688,9 +604,10 @@ app.post('/passenger/share-location', async (c) => {
     const currentCoins = userData.coins || 0
     await kv.set(`user:${user.id}`, { ...userData, coins: currentCoins + 10 })
 
-    // Create bus entry (passenger acting as driver) while preserving route ownership
+    // Create bus entry (passenger acting as driver)
     const busStops = await getDefaultRoutesForBus(busName)
-    const passengerBusRecord = withRouteOwnershipMetadata({
+    
+    await kv.set(`bus:${user.id}`, {
       id: user.id,
       driverName: userData.name,
       route: busName,
@@ -698,15 +615,12 @@ app.post('/passenger/share-location', async (c) => {
       lng: location.lng,
       isOnline: true,
       lastUpdated: new Date().toISOString(),
-      expiresAt: null,
       busStops: busStops,
       isPassengerDriver: true, // Mark as passenger acting as driver
       otpId: validOTP.id,
       tripStartTime: new Date().toISOString(),
       previousLocations: []
-    }, user.id, { driverId: validOTP.driverId, sharedByUserId: user.id })
-
-    await kv.set(`bus:${user.id}`, passengerBusRecord)
+    })
 
     // Create location share record
     const shareId = `share:${user.id}:${Date.now()}`
@@ -719,24 +633,17 @@ app.post('/passenger/share-location', async (c) => {
       lng: location.lng,
       active: true,
       startTime: new Date().toISOString(),
-      // Enforce a 3-hour share TTL independent of OTP lifetime
-      expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+      expiresAt: validOTP.expiresAt, // 5 hours from OTP creation
       driverId: validOTP.driverId,
       otpCode: otpCode
     }
 
     await kv.set(shareId, shareData)
-    await kv.set(`passenger:${user.id}`, {
-      linkedDriverId: validOTP.driverId,
-      activeShareId: shareId,
-      otpId: validOTP.id,
-      linkedAt: new Date().toISOString()
-    })
-    
+
     return c.json({ 
       success: true, 
       share: shareData,
-      message: 'Location sharing started! Valid for 3 hours. +10 coins earned!',
+      message: 'Location sharing started! Valid for 5 hours. +10 coins earned!',
       coinsEarned: 10,
       newBalance: currentCoins + 10
     })
@@ -747,7 +654,7 @@ app.post('/passenger/share-location', async (c) => {
 })
 
 // Stop location sharing (passenger or driver can stop)
-const handlePassengerStopSharing = async (c: any) => {
+app.post('/passenger/stop-sharing', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -755,84 +662,31 @@ const handlePassengerStopSharing = async (c: any) => {
 
   try {
     const { shareId } = await c.req.json()
-
-    // If shareId provided, stop that specific share (driver/owner stopping passenger)
+    
+    // If shareId provided, stop that specific share (driver stopping passenger)
     if (shareId) {
       const share = await kv.get(shareId)
-      if (!share) {
-        return c.json({ error: 'Share not found' }, 404)
+      if (share) {
+        await kv.set(shareId, { ...share, active: false })
+        // Remove bus entry if passenger was acting as driver
+        await kv.del(`bus:${share.userId}`)
       }
+    } else {
+      // Stop own sharing (passenger stopping themselves)
+      const shares = await kv.getByPrefix(`share:${user.id}:`)
+      const activeShare = shares.find(share => share.active)
 
-      const isPassengerOwner = share.userId === user.id
-      const isLinkedDriver = share.driverId === user.id
-      if (!isPassengerOwner && !isLinkedDriver) {
-        return c.json({ error: 'Unauthorized to stop this share' }, 403)
+      if (activeShare) {
+        await kv.set(activeShare.id, { ...activeShare, active: false })
+        // Remove bus entry if passenger was acting as driver
+        await kv.del(`bus:${user.id}`)
       }
-
-      await kv.set(shareId, { ...share, active: false, stoppedAt: new Date().toISOString() })
-      await kv.del(`bus:${share.userId}`)
-      await kv.del(`passenger:${share.userId}`)
-      return c.json({ success: true })
     }
-
-    // Stop own sharing (passenger stopping themselves)
-    const shares = await kv.getByPrefix(`share:${user.id}:`)
-    const activeShare = shares.find(share => share.active)
-
-    if (!activeShare) {
-      return c.json({ error: 'No active location sharing found' }, 404)
-    }
-
-    await kv.set(activeShare.id, { ...activeShare, active: false, stoppedAt: new Date().toISOString() })
-    await kv.del(`bus:${user.id}`)
-    await kv.del(`passenger:${user.id}`)
 
     return c.json({ success: true })
   } catch (error) {
     console.log('Stop sharing error:', error)
     return c.json({ error: 'Failed to stop location sharing' }, 500)
-  }
-}
-
-app.post('/passenger/stop-sharing', handlePassengerStopSharing)
-app.post('/make-server-8b08beda/passenger/stop-sharing', handlePassengerStopSharing)
-
-// Pause location sharing (when device location turned off) - keep last-known for 3 hours
-app.post('/passenger/pause-sharing', async (c) => {
-  const { error: authError, user } = await authenticateRequest(c.req.raw)
-  if (authError || !user) {
-    return c.json({ error: authError || 'Authentication failed' }, 401)
-  }
-
-  try {
-    const shares = await kv.getByPrefix(`share:${user.id}:`)
-    const activeShare = shares.find(share => share.active)
-    if (!activeShare) {
-      return c.json({ error: 'No active location sharing found' }, 404)
-    }
-
-    const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
-
-    // Mark share as paused and update expiresAt
-    await kv.set(activeShare.id, { ...activeShare, paused: true, lastUpdated: new Date().toISOString(), expiresAt })
-
-    // Update bus entry to be offline but retain last-known and expiresAt
-    const busData = await kv.get(`bus:${user.id}`)
-    if (busData) {
-      await kv.set(
-        `bus:${user.id}`,
-        withRouteOwnershipMetadata(
-          { ...busData, isOnline: false, expiresAt, lastUpdated: new Date().toISOString() },
-          user.id,
-          { driverId: busData?.driverId || user.id, sharedByUserId: busData?.sharedByUserId }
-        )
-      )
-    }
-
-    return c.json({ success: true, paused: true, expiresAt })
-  } catch (error) {
-    console.log('Pause sharing error:', error)
-    return c.json({ error: 'Failed to pause location sharing' }, 500)
   }
 })
 
@@ -855,9 +709,8 @@ app.post('/driver/stop-otp', async (c) => {
       const otpShares = allShares.filter(share => share.otpCode === otp.code && share.active)
       
       for (const share of otpShares) {
-        await kv.set(share.id, { ...share, active: false, stoppedAt: new Date().toISOString(), stoppedBy: user.id })
+        await kv.set(share.id, { ...share, active: false })
         await kv.del(`bus:${share.userId}`)
-        await kv.del(`passenger:${share.userId}`)
       }
       
       return c.json({ success: true })
@@ -870,66 +723,21 @@ app.post('/driver/stop-otp', async (c) => {
   }
 })
 
-const handleGetBuses = async (c: any) => {
+// Get all active buses for passengers
+app.get('/buses', async (c) => {
   try {
     const buses = await kv.getByPrefix('bus:')
-    // Return online buses and last-known offline buses that haven't expired
-    const now = new Date().getTime()
-    const visibleBuses = buses.filter(bus => {
-      if (bus.isOnline) return true
-      if (bus.expiresAt) {
-        return new Date(bus.expiresAt).getTime() > now
-      }
-      return false
-    }).map((bus) => withRouteOwnershipMetadata(bus, bus.id, { driverId: bus?.driverId || bus.id }))
+    const activeBuses = buses.filter(bus => bus.isOnline)
 
-    return c.json({ buses: visibleBuses })
+    return c.json({ buses: activeBuses })
   } catch (error) {
     console.log('Buses fetch error:', error)
     return c.json({ error: 'Failed to fetch bus locations' }, 500)
   }
-}
-
-// Get all active buses for passengers
-app.get('/buses', handleGetBuses)
-app.get('/make-server-8b08beda/buses', handleGetBuses)
-
-// Get all visible location shares for universal map visibility
-const handleGetLocationShares = async (c: any) => {
-  const { error: authError, user } = await authenticateRequest(c.req.raw)
-  if (authError || !user) {
-    return c.json({ error: authError || 'Authentication failed' }, 401)
-  }
-
-  try {
-    const allShares = await kv.getByPrefix('share:')
-    const visibleShares: any[] = []
-
-    for (const share of allShares) {
-      if (!share.active) continue
-
-      if (hasShareExpired(share.expiresAt)) {
-        await kv.set(share.id, { ...share, active: false, stoppedAt: new Date().toISOString(), stoppedBy: 'system-expiry' })
-        await kv.del(`bus:${share.userId}`)
-        await kv.del(`passenger:${share.userId}`)
-        continue
-      }
-
-      visibleShares.push(share)
-    }
-
-    return c.json({ shares: visibleShares })
-  } catch (error) {
-    console.log('Location shares fetch error:', error)
-    return c.json({ error: 'Failed to fetch location shares' }, 500)
-  }
-}
-
-app.get('/location-shares', handleGetLocationShares)
-app.get('/make-server-8b08beda/location-shares', handleGetLocationShares)
+})
 
 // Get active location shares for a driver
-const handleGetDriverLocationShares = async (c: any) => {
+app.get('/driver/location-shares', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
   if (authError || !user) {
     return c.json({ error: authError || 'Authentication failed' }, 401)
@@ -937,30 +745,16 @@ const handleGetDriverLocationShares = async (c: any) => {
 
   try {
     const allShares = await kv.getByPrefix('share:')
-    const driverShares: any[] = []
-
-    for (const share of allShares) {
-      if (!share.active || share.driverId !== user.id) continue
-
-      if (hasShareExpired(share.expiresAt)) {
-        await kv.set(share.id, { ...share, active: false, stoppedAt: new Date().toISOString(), stoppedBy: 'system-expiry' })
-        await kv.del(`bus:${share.userId}`)
-        await kv.del(`passenger:${share.userId}`)
-        continue
-      }
-
-      driverShares.push(share)
-    }
+    const driverShares = allShares.filter(share => 
+      share.active && share.driverId === user.id
+    )
 
     return c.json({ shares: driverShares })
   } catch (error) {
     console.log('Location shares fetch error:', error)
     return c.json({ error: 'Failed to fetch location shares' }, 500)
   }
-}
-
-app.get('/driver/location-shares', handleGetDriverLocationShares)
-app.get('/make-server-8b08beda/driver/location-shares', handleGetDriverLocationShares)
+})
 
 // Update passenger location (for active sharing - passenger acting as driver)
 app.post('/passenger/update-location', async (c) => {
@@ -976,19 +770,16 @@ app.post('/passenger/update-location', async (c) => {
     const activeShare = shares.find(share => share.active)
 
     if (activeShare) {
-      const fallbackExpiry = new Date(new Date(activeShare.startTime).getTime() + 3 * 60 * 60 * 1000).toISOString()
-      const effectiveExpiry = activeShare.expiresAt || fallbackExpiry
-
-      if (hasShareExpired(effectiveExpiry)) {
-        await kv.set(activeShare.id, {
-          ...activeShare,
-          active: false,
-          stoppedAt: new Date().toISOString(),
-          stoppedBy: 'system-expiry'
-        })
+      // Check if 5 hours have passed since start
+      const startTime = new Date(activeShare.startTime).getTime()
+      const now = new Date().getTime()
+      const fiveHoursInMs = 5 * 60 * 60 * 1000
+      
+      if (now - startTime > fiveHoursInMs) {
+        // Auto-stop after 5 hours
+        await kv.set(activeShare.id, { ...activeShare, active: false })
         await kv.del(`bus:${user.id}`)
-        await kv.del(`passenger:${user.id}`)
-        return c.json({ success: false, error: 'Location sharing expired after 3 hours', expired: true })
+        return c.json({ success: false, error: 'Location sharing expired after 5 hours', expired: true })
       }
       
       // Update bus location with speed/heading tracking
@@ -1006,20 +797,13 @@ app.post('/passenger/update-location', async (c) => {
           previousLocations.shift()
         }
         
-        await kv.set(
-          `bus:${user.id}`,
-          withRouteOwnershipMetadata(
-            {
-              ...busData,
-              lat: location.lat,
-              lng: location.lng,
-              lastUpdated: new Date().toISOString(),
-              previousLocations
-            },
-            user.id,
-            { driverId: busData?.driverId || activeShare.driverId, sharedByUserId: busData?.sharedByUserId || user.id }
-          )
-        )
+        await kv.set(`bus:${user.id}`, {
+          ...busData,
+          lat: location.lat,
+          lng: location.lng,
+          lastUpdated: new Date().toISOString(),
+          previousLocations
+        })
       }
       
       const updatedShare = {
@@ -1043,16 +827,11 @@ app.post('/passenger/update-location', async (c) => {
 app.get('/bus/:busId/stops', async (c) => {
   try {
     const busId = c.req.param('busId')
-    const rawBusData = await kv.get(`bus:${busId}`)
+    const busData = await kv.get(`bus:${busId}`)
     
-    if (!rawBusData) {
+    if (!busData) {
       return c.json({ error: 'Bus not found' }, 404)
     }
-
-    const busData = withRouteOwnershipMetadata(rawBusData, busId, {
-      driverId: rawBusData?.driverId || busId,
-      sharedByUserId: rawBusData?.sharedByUserId
-    })
 
     // If bus has no stops, try to get default routes
     let busStops = busData.busStops || []
@@ -1060,12 +839,7 @@ app.get('/bus/:busId/stops', async (c) => {
       busStops = await getDefaultRoutesForBus(busData.route)
     }
 
-    return c.json({
-      route: {
-        ...buildRouteEnvelope({ ...busData, busStops }, busId)
-      },
-      busStops
-    })
+    return c.json({ busStops })
   } catch (error) {
     console.log('Bus stops fetch error:', error)
     return c.json({ error: 'Failed to fetch bus stops' }, 500)
@@ -1080,50 +854,24 @@ app.post('/driver/update-stop', async (c) => {
   }
 
   try {
-    const { busId, stopId, passed } = await c.req.json()
-    if (!busId || !stopId || typeof passed !== 'boolean') {
-      return c.json({ error: 'busId, stopId, and passed are required' }, 400)
-    }
-
-    const rawBusData = await kv.get(`bus:${busId}`)
-    if (!rawBusData) {
+    const { stopId, passed } = await c.req.json()
+    
+    const busData = await kv.get(`bus:${user.id}`)
+    if (!busData) {
       return c.json({ error: 'Bus not found' }, 404)
     }
 
-    const busData = withRouteOwnershipMetadata(rawBusData, busId, {
-      driverId: rawBusData?.driverId || busId,
-      sharedByUserId: rawBusData?.sharedByUserId
-    })
-
-    const isRouteOwner = user.id === busData.driverId
-    let isLinkedPassenger = false
-
-    if (!isRouteOwner) {
-      const passengerLink = await kv.get(`passenger:${user.id}`)
-      isLinkedPassenger =
-        !!passengerLink &&
-        passengerLink.linkedDriverId === busData.driverId &&
-        busData.sharedByUserId === user.id
-    }
-
-    if (!isRouteOwner && !isLinkedPassenger) {
-      return c.json({ error: 'Unauthorized to mark stop on this route' }, 403)
-    }
-
-    const updatedBusStops = (busData.busStops || []).map(stop => 
+    const updatedBusStops = busData.busStops?.map(stop => 
       stop.id === stopId ? { ...stop, passed } : stop
-    )
+    ) || []
 
-    const updatedBusData = withRouteOwnershipMetadata({
-      ...rawBusData,
+    const updatedBusData = {
+      ...busData,
       busStops: updatedBusStops,
       lastUpdated: new Date().toISOString()
-    }, busId, {
-      driverId: busData.driverId,
-      sharedByUserId: busData.sharedByUserId
-    })
+    }
 
-    await kv.set(`bus:${busId}`, updatedBusData)
+    await kv.set(`bus:${user.id}`, updatedBusData)
 
     return c.json({ success: true, busStops: updatedBusStops })
   } catch (error) {
@@ -1141,36 +889,26 @@ app.post('/driver/update-stops', async (c) => {
 
   try {
     const { busId, busStops } = await c.req.json()
-    if (!busId || !Array.isArray(busStops)) {
-      return c.json({ error: 'busId and busStops are required' }, 400)
+    
+    // Verify the bus belongs to this driver
+    if (busId !== user.id) {
+      return c.json({ error: 'Unauthorized to update this bus' }, 403)
     }
 
-    const rawBusData = await kv.get(`bus:${busId}`)
-    if (!rawBusData) {
+    const busData = await kv.get(`bus:${user.id}`)
+    if (!busData) {
       return c.json({ error: 'Bus not found' }, 404)
     }
 
-    const busData = withRouteOwnershipMetadata(rawBusData, busId, {
-      driverId: rawBusData?.driverId || busId,
-      sharedByUserId: rawBusData?.sharedByUserId
-    })
-
-    if (user.id !== busData.driverId) {
-      return c.json({ error: 'Unauthorized to update this route' }, 403)
+    const updatedBusData = {
+      ...busData,
+      busStops: busStops,
+      lastUpdated: new Date().toISOString()
     }
 
-    const updatedBusData = withRouteOwnershipMetadata({
-      ...rawBusData,
-      busStops,
-      lastUpdated: new Date().toISOString()
-    }, busId, {
-      driverId: busData.driverId,
-      sharedByUserId: busData.sharedByUserId
-    })
+    await kv.set(`bus:${user.id}`, updatedBusData)
 
-    await kv.set(`bus:${busId}`, updatedBusData)
-
-    return c.json({ success: true, busStops })
+    return c.json({ success: true, busStops: busStops })
   } catch (error) {
     console.log('Bus stops update error:', error)
     return c.json({ error: 'Failed to update bus stops' }, 500)
@@ -1186,26 +924,19 @@ app.post('/driver/add-route', async (c) => {
 
   try {
     const { busId, routeName } = await c.req.json()
-    if (!busId) {
-      return c.json({ error: 'busId is required' }, 400)
+    
+    // Verify the bus belongs to this driver
+    if (busId !== user.id) {
+      return c.json({ error: 'Unauthorized to update this bus' }, 403)
     }
 
     if (!routeName || !routeName.trim()) {
       return c.json({ error: 'Route name is required' }, 400)
     }
 
-    const rawBusData = await kv.get(`bus:${busId}`)
-    if (!rawBusData) {
+    const busData = await kv.get(`bus:${user.id}`)
+    if (!busData) {
       return c.json({ error: 'Bus not found' }, 404)
-    }
-
-    const busData = withRouteOwnershipMetadata(rawBusData, busId, {
-      driverId: rawBusData?.driverId || busId,
-      sharedByUserId: rawBusData?.sharedByUserId
-    })
-
-    if (user.id !== busData.driverId) {
-      return c.json({ error: 'Unauthorized to update this route' }, 403)
     }
 
     // Get existing stops or default routes
@@ -1227,16 +958,13 @@ app.post('/driver/add-route', async (c) => {
 
     const updatedBusStops = [...busStops, newStop]
 
-    const updatedBusData = withRouteOwnershipMetadata({
-      ...rawBusData,
+    const updatedBusData = {
+      ...busData,
       busStops: updatedBusStops,
       lastUpdated: new Date().toISOString()
-    }, busId, {
-      driverId: busData.driverId,
-      sharedByUserId: busData.sharedByUserId
-    })
+    }
 
-    await kv.set(`bus:${busId}`, updatedBusData)
+    await kv.set(`bus:${user.id}`, updatedBusData)
 
     return c.json({ success: true, busStops: updatedBusStops })
   } catch (error) {
@@ -1245,7 +973,8 @@ app.post('/driver/add-route', async (c) => {
   }
 })
 
-const handleGetAvailableBuses = async (c: any) => {
+// Get available bus list (public endpoint - no auth required)
+app.get('/buses/available', async (c) => {
   try {
     const buses = await initializeDefaultBuses()
     return c.json({ buses })
@@ -1253,11 +982,7 @@ const handleGetAvailableBuses = async (c: any) => {
     console.log('Fetching available buses error:', error)
     return c.json({ error: 'Failed to fetch available buses' }, 500)
   }
-}
-
-// Get available bus list (public endpoint - no auth required)
-app.get('/buses/available', handleGetAvailableBuses)
-app.get('/make-server-8b08beda/buses/available', handleGetAvailableBuses)
+})
 
 // Add new bus to the list (drivers only)
 app.post('/buses/add', async (c) => {
@@ -1392,17 +1117,44 @@ app.post('/chatbot', async (c) => {
   }
 })
 
-// Start the server.
-// Some gateway/proxy paths may include the function slug again
-// (e.g. /make-server-8b08beda/driver/location-shares).
-// Normalize that prefix so all routes resolve consistently.
-const FUNCTION_PATH_PREFIX = '/make-server-8b08beda'
-
-Deno.serve((request: Request) => {
-  const url = new URL(request.url)
-  if (url.pathname === FUNCTION_PATH_PREFIX || url.pathname.startsWith(`${FUNCTION_PATH_PREFIX}/`)) {
-    url.pathname = url.pathname.slice(FUNCTION_PATH_PREFIX.length) || '/'
-    request = new Request(url.toString(), request)
+// Admin: Get all registered users
+app.get('/admin/users', async (c) => {
+  const { error: authError, user } = await authenticateRequest(c.req.raw)
+  if (authError || !user) {
+    return c.json({ error: authError || 'Authentication failed' }, 401)
   }
-  return app.fetch(request)
+
+  try {
+    // Get current user data to check admin role
+    const userData = await kv.get(`user:${user.id}`)
+    if (!userData) {
+      return c.json({ error: 'User not found' }, 404)
+    }
+
+    // Check if user has admin role
+    if (userData.role !== 'admin') {
+      return c.json({ error: 'Unauthorized. Admin access required.' }, 403)
+    }
+
+    // Get all users from KV store
+    const allUsers = await kv.getByPrefix('user:')
+    \n    // Sort by creation date (newest first)
+    const sortedUsers = allUsers.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime()
+      const dateB = new Date(b.createdAt || 0).getTime()
+      return dateB - dateA
+    })
+
+    return c.json({ 
+      success: true, 
+      users: sortedUsers,
+      totalCount: sortedUsers.length 
+    })
+  } catch (error) {
+    console.log('Admin users fetch error:', error)
+    return c.json({ error: 'Failed to fetch users' }, 500)
+  }
 })
+
+// Start the server
+Deno.serve(app.fetch)

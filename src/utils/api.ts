@@ -1,6 +1,6 @@
 import { projectId, publicAnonKey } from './supabase/info';
 
-export const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-8b08beda`;
+const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/server`;
 
 export interface ApiResponse<T = any> {
   success?: boolean;
@@ -42,12 +42,9 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = `${API_BASE_URL}${normalizedEndpoint}`;
-    const prefixedEndpoint = normalizedEndpoint.startsWith('/make-server-8b08beda/')
-      ? normalizedEndpoint
-      : `/make-server-8b08beda${normalizedEndpoint}`;
-    const prefixedUrl = `${API_BASE_URL}${prefixedEndpoint}`;
+    // Ensure endpoint starts with a slash
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${path}`;
     
     const headers = {
       'Content-Type': 'application/json',
@@ -57,20 +54,11 @@ class ApiClient {
     };
 
     try {
-      let response = await fetch(url, {
+      const response = await fetch(url, {
         ...options,
         headers,
+        mode: 'cors' // Explicitly set CORS mode
       });
-
-      // Some Supabase edge gateways forward with an extra function slug segment.
-      // Retry once with '/make-server-8b08beda' prefix if the first path 404s.
-      if (!response.ok && response.status === 404 && prefixedUrl !== url) {
-        console.warn(`API 404 for ${url}. Retrying with ${prefixedUrl}`);
-        response = await fetch(prefixedUrl, {
-          ...options,
-          headers,
-        });
-      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -142,10 +130,6 @@ class ApiClient {
     return this.request('/driver/location-shares');
   }
 
-  async getAllLocationShares() {
-    return this.request('/location-shares');
-  }
-
   // Passenger functions
   async startLocationSharing(otpCode: string, location: { lat: number; lng: number }, busName: string) {
     return this.request('/passenger/share-location', {
@@ -159,12 +143,6 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ shareId }),
     });
-  }
-
-  async pauseLocationSharing() {
-    return this.request('/passenger/pause-sharing', {
-      method: 'POST'
-    })
   }
 
   async stopOTP(otpId: string) {
@@ -201,10 +179,10 @@ class ApiClient {
     return this.request(`/bus/${busId}/stops`);
   }
 
-  async updateBusStop(busId: string, stopId: string, passed: boolean) {
+  async updateBusStop(stopId: string, passed: boolean) {
     return this.request('/driver/update-stop', {
       method: 'POST',
-      body: JSON.stringify({ busId, stopId, passed }),
+      body: JSON.stringify({ stopId, passed }),
     });
   }
 
@@ -225,6 +203,11 @@ class ApiClient {
   // Health check
   async health() {
     return this.request('/health');
+  }
+
+  // Admin functions
+  async getAllUsers() {
+    return this.request('/admin/users');
   }
 }
 

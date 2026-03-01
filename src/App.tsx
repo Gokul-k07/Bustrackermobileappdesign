@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from './components/ui/textarea';
 import { Label } from './components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from './utils/supabase/info';
 import { apiClient } from './utils/api';
@@ -19,8 +19,9 @@ import { DriverDashboard } from './components/DriverDashboard';
 import { PassengerDashboard } from './components/PassengerDashboard';
 import { MapView } from './components/MapView';
 import { AIChat } from './components/AIChat';
+import { AdminDashboard } from './components/AdminDashboard';
 
-export type UserRole = 'driver' | 'passenger' | null;
+export type UserRole = 'driver' | 'passenger' | 'admin' | null;
 
 export interface User {
   id: string;
@@ -28,7 +29,6 @@ export interface User {
   email: string;
   role: UserRole;
   coins?: number;
-  linkedDriverId?: string | null;
 }
 
 export interface BusStop {
@@ -49,9 +49,6 @@ export interface BusLocation {
   isOnline: boolean;
   lastUpdated: string;
   busStops?: BusStop[];
-  routeId?: string;
-  driverId?: string;
-  sharedByUserId?: string | null;
 }
 
 export interface LocationShare {
@@ -63,18 +60,6 @@ export interface LocationShare {
   active: boolean;
   startTime: string;
   driverId: string;
-  lastUpdated?: string;
-  expiresAt?: string;
-}
-
-export interface RouteMeta {
-  routeId: string;
-  driverId: string;
-  sharedByUserId?: string | null;
-  stops: BusStop[];
-  passedStops: string[];
-  editable: boolean;
-  canMarkPassed: boolean;
 }
 
 export interface OTP {
@@ -93,14 +78,6 @@ const supabase = createClient(
 );
 
 export default function App() {
-  const shouldSilenceBackgroundError = (message?: string) => {
-    if (!message) return false;
-    return (
-      message.includes('Authentication failed') ||
-      message.includes('Invalid or expired token')
-    );
-  };
-
   // App state
   const [currentScreen, setCurrentScreen] = useState<'onboarding' | 'roleSelection' | 'main'>('onboarding');
   const [user, setUser] = useState<User | null>(null);
@@ -110,13 +87,11 @@ export default function App() {
   // Driver state
   const [isOnline, setIsOnline] = useState(false);
   const [otps, setOtps] = useState<OTP[]>([]);
-  const [mapLocationShares, setMapLocationShares] = useState<LocationShare[]>([]);
-  const [driverLocationShares, setDriverLocationShares] = useState<LocationShare[]>([]);
+  const [locationShares, setLocationShares] = useState<LocationShare[]>([]);
 
   // Passenger state
   const [busLocations, setBusLocations] = useState<BusLocation[]>([]);
   const [isLocationSharing, setIsLocationSharing] = useState(false);
-  const [lastPositionTimestamp, setLastPositionTimestamp] = useState<number | null>(null);
 
   // Current location with geolocation support (default to PSNACET location in Tamil Nadu, India)
   const [currentLocation, setCurrentLocation] = useState({ lat: 10.3673, lng: 77.9738 });
@@ -135,46 +110,12 @@ export default function App() {
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
 
-  const clearAuthState = (message?: string) => {
-    setSession(null);
-    setUser(null);
-    apiClient.setAccessToken(null);
-    setCurrentScreen('onboarding');
-    if (message) {
-      toast.error(message);
-    }
-  };
 
   // Check for existing session, restore state, and setup geolocation on mount
   useEffect(() => {
     restoreAppState();
     checkSession();
     requestLocationPermission();
-  }, []);
-
-  // Watch for auth state changes (handles refresh token failures)
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === 'TOKEN_REFRESH_FAILED') {
-        console.warn('Session refresh failed');
-        clearAuthState('Session expired. Please sign in again.');
-        return;
-      }
-
-      if (event === 'SIGNED_OUT') {
-        clearAuthState();
-        return;
-      }
-
-      if (event === 'SIGNED_IN' && nextSession) {
-        setSession(nextSession);
-        apiClient.setAccessToken(nextSession.access_token);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   // Restore app state from localStorage
@@ -231,10 +172,12 @@ export default function App() {
         if (navigator.permissions && navigator.permissions.query) {
           navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(permissionStatus => {
             if (permissionStatus.state === 'denied') {
-              console.warn('Geolocation permission was previously denied');
+              // Silent fallback - already denied, just use default location
               setLocationPermissionGranted(false);
             }
-          }).catch(err => console.warn('Permissions API not supported or error:', err));
+          }).catch(() => {
+            // Silently ignore Permissions API errors
+          });
         }
 
         navigator.geolocation.getCurrentPosition(
@@ -252,10 +195,9 @@ export default function App() {
                   lat: position.coords.latitude,
                   lng: position.coords.longitude
                 });
-                setLastPositionTimestamp(Date.now());
               },
-              (error) => {
-                console.warn('Location tracking error:', error);
+              () => {
+                // Silently handle tracking errors
               },
               {
                 enableHighAccuracy: true,
@@ -269,32 +211,30 @@ export default function App() {
             };
           },
           (error) => {
-            console.warn('Geolocation error:', error.message || error.code);
             setLocationPermissionGranted(false);
             
-            // Provide helpful feedback for policy restrictions
-            if (error.code === 1) { // PERMISSION_DENIED
-              toast.error('Location Permission Denied', {
-                description: 'Please enable location services in your browser settings to use live tracking.',
-                duration: 5000
+            // Only show toast for user-actionable errors, not policy blocks
+            if (error.code === 1 && !error.message?.includes('permissions policy')) {
+              toast.info('Location Access', {
+                description: 'Enable location services for better accuracy. Using default location for now.',
+                duration: 4000
               });
-            } else if (error.message && error.message.includes('permissions policy')) {
-              console.error('Permission policy blocks geolocation');
-              // This is often due to iframe restrictions or cross-origin issues
             }
+            // Silently fallback to default location for policy blocks
           },
           {
-            enableHighAccuracy: false, // Use lower accuracy for initial check to avoid some policy blocks
+            enableHighAccuracy: false,
             timeout: 5000,
             maximumAge: Infinity
           }
         );
       } catch (err: any) {
-        console.warn('Geolocation initialization error:', err);
         setLocationPermissionGranted(false);
+        // Silent fallback to default location
       }
     } else {
-      console.warn('Geolocation not supported by this browser');
+      // Browser doesn't support geolocation - use default location silently
+      setLocationPermissionGranted(false);
     }
   };
 
@@ -306,18 +246,15 @@ export default function App() {
       // Initial data load
       loadUserData();
       loadAvailableBuses(); // Load buses after authentication
-      loadMapData();
-      if (user.role === 'driver') {
-        loadDriverData();
-      }
       
       // Set up periodic updates for real-time location display
       const interval = setInterval(() => {
         if (user.role === 'driver') {
           loadDriverData();
+        } else if (user.role === 'passenger') {
+          loadPassengerData();
         }
-        loadMapData();
-      }, 3000); // Poll every 3 seconds to reduce request noise
+      }, 1000); // Update every second for real-time tracking
 
       return () => clearInterval(interval);
     }
@@ -342,7 +279,6 @@ export default function App() {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
               };
-              setLastPositionTimestamp(Date.now());
               
               // Update immediately on position change
               try {
@@ -405,11 +341,7 @@ export default function App() {
       
       if (sessionError) {
         console.warn('Session error:', sessionError.message);
-        if (sessionError.message?.toLowerCase().includes('refresh token')) {
-          clearAuthState('Session expired. Please sign in again.');
-        } else {
-          clearAuthState();
-        }
+        setCurrentScreen('onboarding');
         setLoading(false);
         return;
       }
@@ -458,27 +390,23 @@ export default function App() {
       ]);
       
       setOtps(otpsData.otps || []);
-      setDriverLocationShares(sharesData.shares || []);
+      setLocationShares(sharesData.shares || []);
     } catch (error: any) {
       // Don't log errors if user just switched roles or logged out
-      if (!shouldSilenceBackgroundError(error.message)) {
+      if (error.message && !error.message.includes('Authentication failed')) {
         console.warn('Failed to load driver data:', error.message);
       }
     }
   };
 
-  const loadMapData = async () => {
+  const loadPassengerData = async () => {
     try {
-      const [busesData, sharesData] = await Promise.all([
-        apiClient.getBuses(),
-        apiClient.getAllLocationShares()
-      ]);
+      const busesData = await apiClient.getBuses();
       setBusLocations(busesData.buses || []);
-      setMapLocationShares(sharesData.shares || []);
     } catch (error: any) {
       // Don't log errors if user just switched roles or logged out
-      if (!shouldSilenceBackgroundError(error.message)) {
-        console.warn('Failed to load map data:', error.message);
+      if (error.message && !error.message.includes('Authentication failed')) {
+        console.warn('Failed to load passenger data:', error.message);
       }
     }
   };
@@ -587,10 +515,10 @@ export default function App() {
       setIsLocationSharing(true);
       
       // Immediately refresh bus locations to show the passenger as a bus
-      await loadMapData();
+      await loadBusLocations();
       
       toast.success('Location sharing started!', {
-        description: `Valid for 3 hours. You earned 10 coins! Your bus: ${busName}`
+        description: `Valid for 5 hours. You earned 10 coins! Your bus: ${busName}`
       });
       
       // Refresh user profile to get updated coin balance
@@ -616,7 +544,7 @@ export default function App() {
       localStorage.removeItem('bustracker_sharing_state');
       
       // Immediately refresh bus locations to remove the passenger from bus list
-      await loadMapData();
+      await loadBusLocations();
       
       toast.info('Location sharing stopped');
     } catch (error: any) {
@@ -625,7 +553,7 @@ export default function App() {
     }
   };
 
-  // Check for expired sharing (3 hours)
+  // Check for expired sharing (5 hours)
   useEffect(() => {
     const checkSharingExpiry = () => {
       try {
@@ -634,11 +562,11 @@ export default function App() {
           const state = JSON.parse(savedState);
           const startTime = new Date(state.startTime).getTime();
           const now = new Date().getTime();
-          const threeHours = 3 * 60 * 60 * 1000;
-
-          if (now - startTime > threeHours) {
+          const fiveHours = 5 * 60 * 60 * 1000;
+          
+          if (now - startTime > fiveHours) {
             stopLocationSharing();
-            toast.info('Location sharing stopped automatically after 3 hours');
+            toast.info('Location sharing stopped automatically after 5 hours');
           }
         }
       } catch (error) {
@@ -652,87 +580,6 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [isLocationSharing]);
-
-  // Monitor permission state changes (Permissions API) to detect if user turns off device location
-  useEffect(() => {
-    if (!('permissions' in navigator)) return;
-    let permissionStatus: any = null;
-    let cancelled = false;
-
-    navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((p: any) => {
-      if (cancelled) return;
-      permissionStatus = p;
-      permissionStatus.onchange = async () => {
-        try {
-          if (permissionStatus.state !== 'granted') {
-            // If user revokes location while sharing, pause sharing and keep last-known for 3 hours
-            if (user?.role === 'passenger' && isLocationSharing) {
-              await apiClient.pauseLocationSharing();
-              toast.info("Location updates stopped — others will see your last location for up to 3 hours. Turn on location to resume.");
-            }
-
-            if (user?.role === 'driver' && isOnline) {
-              await apiClient.updateDriverStatus(false);
-              setIsOnline(false);
-              toast.info('You were marked offline due to location being disabled');
-            }
-          } else {
-            // Permission granted/resumed: attempt a quick location update to resume sharing
-            if (user?.role === 'passenger' && isLocationSharing) {
-              try { await apiClient.updateLocation(currentLocation); } catch {}
-            }
-            if (user?.role === 'driver' && isOnline) {
-              try { await apiClient.updateDriverStatus(true, currentLocation); } catch {}
-            }
-          }
-        } catch (err) {
-          console.warn('Permission onchange handler error:', err);
-        }
-      }
-    }).catch(() => {});
-
-    return () => {
-      cancelled = true;
-      if (permissionStatus) permissionStatus.onchange = null;
-    }
-  }, [user, isLocationSharing, isOnline, currentLocation]);
-
-  // Heartbeat: detect if location updates stop (no position update within threshold)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (!user) return;
-      const now = Date.now();
-
-      // Passenger: if sharing but no recent position or permission revoked, pause sharing
-      if (user.role === 'passenger' && isLocationSharing) {
-        const missed = lastPositionTimestamp ? (now - lastPositionTimestamp) > 30000 : true;
-        if (!locationPermissionGranted || missed) {
-          try {
-            await apiClient.pauseLocationSharing();
-            toast.info('No recent location updates — showing last known location to others for up to 3 hours.');
-          } catch (err) {
-            console.warn('Failed to pause sharing via heartbeat:', err);
-          }
-        }
-      }
-
-      // Driver: mark offline if no location updates
-      if (user.role === 'driver' && isOnline) {
-        const missed = lastPositionTimestamp ? (now - lastPositionTimestamp) > 30000 : true;
-        if (!locationPermissionGranted || missed) {
-          try {
-            await apiClient.updateDriverStatus(false);
-            setIsOnline(false);
-            toast.info('You were marked offline due to lack of location updates');
-          } catch (err) {
-            console.warn('Failed to mark driver offline via heartbeat:', err);
-          }
-        }
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [user, isLocationSharing, isOnline, locationPermissionGranted, lastPositionTimestamp, currentLocation]);
 
   const toggleDriverOnline = async (busName?: string) => {
     try {
@@ -784,8 +631,7 @@ export default function App() {
   const stopPassengerSharing = async (shareId: string) => {
     try {
       await apiClient.stopLocationSharing(shareId);
-      setDriverLocationShares(prev => prev.filter(share => share.id !== shareId));
-      setMapLocationShares(prev => prev.filter(share => share.id !== shareId));
+      setLocationShares(locationShares.filter(share => share.id !== shareId));
       toast.success('Passenger sharing stopped');
     } catch (error: any) {
       console.error('Stop passenger sharing error:', error);
@@ -877,8 +723,8 @@ export default function App() {
               <Coins className="h-3 w-3" />
               {user.coins || 0}
             </Badge>
-            <Badge variant={isOnline && user.role === 'driver' ? 'default' : 'secondary'}>
-              {user.role === 'driver' ? (isOnline ? 'Online' : 'Offline') : 'Passenger'}
+            <Badge variant={user.role === 'admin' ? 'destructive' : (isOnline && user.role === 'driver' ? 'default' : 'secondary')}>
+              {user.role === 'admin' ? 'Admin' : (user.role === 'driver' ? (isOnline ? 'Online' : 'Offline') : 'Passenger')}
             </Badge>
           </div>
         </div>
@@ -887,13 +733,15 @@ export default function App() {
         <div className="pb-32">
           {activeTab === 'home' && (
             <div className="p-4">
-              {user.role === 'driver' ? (
+              {user.role === 'admin' ? (
+                <AdminDashboard currentUser={user} />
+              ) : user.role === 'driver' ? (
                 <DriverDashboard
                   isOnline={isOnline}
                   onToggleOnline={toggleDriverOnline}
                   onGenerateOTP={generateOTP}
                   otps={otps}
-                  locationShares={driverLocationShares}
+                  locationShares={locationShares}
                   currentLocation={currentLocation}
                   onStopOTP={stopOTP}
                   onStopPassengerSharing={stopPassengerSharing}
@@ -917,11 +765,10 @@ export default function App() {
             <div className="p-4">
               <MapView
                 busLocations={busLocations}
-                locationShares={mapLocationShares}
+                locationShares={locationShares}
                 currentLocation={currentLocation}
                 userRole={user.role}
                 userId={user.id}
-                userLinkedDriverId={user.linkedDriverId || null}
                 isLocationSharing={isLocationSharing}
                 locationPermissionGranted={locationPermissionGranted}
               />

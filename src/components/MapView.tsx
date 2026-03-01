@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Bus, Navigation, X, CheckCircle, Edit2, Save, Plus, Trash2, Clock, Compass, Gauge } from 'lucide-react';
+import { MapPin, Bus, Users, Navigation, ZoomIn, ZoomOut, RotateCcw, X, CheckCircle, Circle, Edit2, Save, Plus, Trash2, Clock, TrendingUp, Compass, Gauge } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { BusLocation, LocationShare, UserRole, BusStop, RouteMeta } from '../App';
+import { BusLocation, LocationShare, UserRole, BusStop } from '../App';
 import { apiClient } from '../utils/api';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 
 interface MapViewProps {
   busLocations: BusLocation[];
@@ -16,7 +16,6 @@ interface MapViewProps {
   currentLocation: { lat: number; lng: number };
   userRole: UserRole;
   userId?: string;
-  userLinkedDriverId?: string | null;
   isLocationSharing?: boolean;
   locationPermissionGranted?: boolean;
 }
@@ -27,51 +26,7 @@ declare global {
   }
 }
 
-type LatLngTuple = [number, number];
-
-interface OpenRouteServiceGeoJsonResponse {
-  features?: Array<{
-    geometry?: {
-      coordinates?: Array<[number, number]>;
-    };
-  }>;
-  error?: {
-    message?: string;
-  };
-}
-
-const OPENROUTES_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjdiMGNkYjk3ZTBhMDQ4MzA4N2MzNTA4YTFlNWFmMjUzIiwiaCI6Im11cm11cjY0In0=';
-const OPENROUTES_DIRECTIONS_URL = 'https://api.openrouteservice.org/v2/directions/driving-car';
-
-function hashSeed(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getMarkerOffset(seed: string) {
-  const hash = hashSeed(seed);
-  const angle = (hash % 360) * (Math.PI / 180);
-  const magnitude = 0.00008 + ((hash % 7) * 0.00001); // ~9m to ~17m
-  return {
-    lat: Math.sin(angle) * magnitude,
-    lng: Math.cos(angle) * magnitude
-  };
-}
-
-export function MapView({
-  busLocations,
-  locationShares,
-  currentLocation,
-  userRole,
-  userId,
-  userLinkedDriverId,
-  isLocationSharing,
-  locationPermissionGranted
-}: MapViewProps) {
+export function MapView({ busLocations, locationShares, currentLocation, userRole, userId, isLocationSharing, locationPermissionGranted }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
@@ -79,7 +34,6 @@ export function MapView({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
-  const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(null);
   const [showBusDetails, setShowBusDetails] = useState(false);
   const [showRouteView, setShowRouteView] = useState(false);
   const [editingStops, setEditingStops] = useState(false);
@@ -87,10 +41,7 @@ export function MapView({
   const [newRouteName, setNewRouteName] = useState('');
   const [isAddingRoute, setIsAddingRoute] = useState(false);
   
-  // Show all visible buses (online or last-known offline within expiry)
-  const visibleBuses = busLocations || [];
-  const onlineBuses = visibleBuses.filter((bus) => bus.isOnline);
-  const waitingBuses = visibleBuses.filter((bus) => !bus.isOnline);
+  const onlineBuses = busLocations.filter(bus => bus.isOnline);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -287,24 +238,22 @@ export function MapView({
     // They will appear as a regular bus marker with their chosen bus name
     // No need to add a separate user location marker
 
-    // Add bus markers (online => vibrant, offline/last-known => faded)
-    visibleBuses.forEach((bus) => {
-      const isOnlineBus = !!bus.isOnline;
+    // Add bus markers with PURPLE/MAGENTA color
+    onlineBuses.forEach((bus) => {
       const busIcon = L.divIcon({
         html: `
           <div style="
-            background: ${isOnlineBus ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'linear-gradient(135deg, rgba(167,167,167,0.4) 0%, rgba(200,200,200,0.4) 100%)'};
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
             width: 32px;
             height: 32px;
             border-radius: 6px;
             border: 2px solid white;
-            box-shadow: 0 4px 12px ${isOnlineBus ? 'rgba(168, 85, 247, 0.6)' : 'rgba(100,100,100,0.2)'};
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 16px;
             cursor: pointer;
-            opacity: ${isOnlineBus ? '1' : '0.6'};
           ">🚌</div>
         `,
         className: 'custom-marker bus-marker',
@@ -317,116 +266,74 @@ export function MapView({
         .on('click', () => {
           handleBusClick(bus);
         });
-
-      // Popup: show last seen for offline buses
-      if (!isOnlineBus && bus.lastUpdated) {
-        busMarker.bindPopup(`<div style="color: #1f2937; font-family: sans-serif;"><b>${bus.route}</b><br/>Last seen: ${formatTime(bus.lastUpdated)}<br/>Status: Last location</div>`)
-      }
-
+      
       markersRef.current[`bus-${bus.id}`] = busMarker;
     });
 
-    // Add passenger markers - show for all users (passengers and drivers)
-    locationShares.forEach((share) => {
-      const isActiveShare = !!share.active;
-      const hasOverlappingBus = visibleBuses.some((bus) =>
-        Math.abs(bus.lat - share.lat) < 0.000001 &&
-        Math.abs(bus.lng - share.lng) < 0.000001
-      );
-      const offset = hasOverlappingBus ? getMarkerOffset(share.id) : { lat: 0, lng: 0 };
-      const markerLat = share.lat + offset.lat;
-      const markerLng = share.lng + offset.lng;
-      const passengerIcon = L.divIcon({
-        html: `
-          <div style="
-            background: ${isActiveShare ? 'linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%)' : 'linear-gradient(135deg, rgba(150,150,150,0.4) 0%, rgba(180,180,180,0.4) 100%)'};
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            border: 2px solid white;
-            box-shadow: 0 4px 12px ${isActiveShare ? 'rgba(6, 182, 212, 0.6)' : 'rgba(100,100,100,0.2)'};
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            opacity: ${isActiveShare ? '1' : '0.6'};
-          ">🚌</div>
-        `,
-        className: 'custom-marker',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+    // Add passenger markers - CYAN/TEAL for sharing passengers (driver view only)
+    if (userRole === 'driver') {
+      locationShares.forEach((share) => {
+        const passengerIcon = L.divIcon({
+          html: `
+            <div style="
+              background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%);
+              width: 28px;
+              height: 28px;
+              border-radius: 6px;
+              border: 2px solid white;
+              box-shadow: 0 4px 12px rgba(6, 182, 212, 0.6);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 14px;
+            ">🚌</div>
+          `,
+          className: 'custom-marker',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+
+        const passengerMarker = L.marker([share.lat, share.lng], { icon: passengerIcon })
+          .addTo(mapInstance.current)
+          .bindPopup(`<div style="color: #1f2937; font-family: sans-serif;"><b>${share.userName}</b><br/>Passenger Sharing<br/>Since: ${formatTime(share.startTime)}</div>`);
+        
+        markersRef.current[`passenger-${share.id}`] = passengerMarker;
       });
+    }
 
-      const popupText = `<div style="color: #1f2937; font-family: sans-serif;"><b>${share.userName}</b><br/>${isActiveShare ? 'Passenger Sharing' : 'Last known location'}<br/>Since: ${formatTime(share.startTime)}</div>`;
-
-      const passengerMarker = L.marker([markerLat, markerLng], { icon: passengerIcon })
-        .addTo(mapInstance.current)
-        .bindPopup(popupText);
-
-      markersRef.current[`passenger-${share.id}`] = passengerMarker;
-    });
-
-  }, [mapLoaded, currentLocation, visibleBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
+  }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
 
   const handleBusClick = async (bus: BusLocation) => {
-    const isSameBus = selectedBus?.id === bus.id;
-
-    setSelectedBus(bus);
-    setShowBusDetails(!isSameBus);
-    setShowRouteView(isSameBus);
+    // First click: Show bus details
+    if (!selectedBus || selectedBus.id !== bus.id) {
+      setSelectedBus(bus);
+      setShowBusDetails(true);
+      setShowRouteView(false);
+      
+      // Load bus stops
+      try {
+        const response = await apiClient.getBusStops(bus.id);
+        const stops = response.busStops || bus.busStops || [];
+        setBusStops(stops);
+        setEditedStops(stops);
+      } catch (error) {
+        console.error('Failed to load bus stops:', error);
+        const stops = bus.busStops || [];
+        setBusStops(stops);
+        setEditedStops(stops);
+      }
+    } else {
+      // Second click: Show route view with path on map
+      setShowBusDetails(false);
+      setShowRouteView(true);
+      drawRoutePath(bus, busStops);
+    }
+    
     setEditingStops(false);
     setNewRouteName('');
-
-    // Always load and draw route on click so users see it immediately on the map.
-    try {
-      const response = await apiClient.getBusStops(bus.id);
-      const route = response.route;
-      const stops = route?.stops || response.busStops || bus.busStops || [];
-      const routeDriverId = route?.driverId || bus.driverId || bus.id;
-      const routeSharedByUserId = route?.sharedByUserId || bus.sharedByUserId || null;
-      const editable = userId === routeDriverId;
-      const canMarkPassed =
-        editable ||
-        (!!userLinkedDriverId && userLinkedDriverId === routeDriverId && routeSharedByUserId === userId);
-
-      setRouteMeta({
-        routeId: route?.routeId || bus.routeId || bus.id,
-        driverId: routeDriverId,
-        sharedByUserId: routeSharedByUserId,
-        stops,
-        passedStops: route?.passedStops || stops.filter((stop: BusStop) => stop.passed).map((stop: BusStop) => stop.id),
-        editable,
-        canMarkPassed
-      });
-      setBusStops(stops);
-      setEditedStops(stops);
-      await drawRoutePath(bus, stops);
-    } catch (error) {
-      console.error('Failed to load bus stops:', error);
-      const fallbackStops = bus.busStops || [];
-      const routeDriverId = bus.driverId || bus.id;
-      const routeSharedByUserId = bus.sharedByUserId || null;
-      const editable = userId === routeDriverId;
-      const canMarkPassed =
-        editable ||
-        (!!userLinkedDriverId && userLinkedDriverId === routeDriverId && routeSharedByUserId === userId);
-
-      setRouteMeta({
-        routeId: bus.routeId || bus.id,
-        driverId: routeDriverId,
-        sharedByUserId: routeSharedByUserId,
-        stops: fallbackStops,
-        passedStops: fallbackStops.filter((stop: BusStop) => stop.passed).map((stop: BusStop) => stop.id),
-        editable,
-        canMarkPassed
-      });
-      setBusStops(fallbackStops);
-      setEditedStops(fallbackStops);
-      await drawRoutePath(bus, fallbackStops);
-    }
   };
 
-  const drawRoutePath = async (bus: BusLocation, stops: BusStop[]) => {
+  const drawRoutePath = (bus: BusLocation, stops: BusStop[]) => {
     if (!mapInstance.current || !mapLoaded) return;
     
     const L = window.L;
@@ -442,23 +349,18 @@ export function MapView({
     // Create route layer group
     const routeLayer = L.layerGroup().addTo(mapInstance.current);
     
-    const stopCoordinates: Array<{ lat: number; lng: number; stop: BusStop; index: number }> = [];
+    // Draw route line with road routing (blue lines like Google Maps)
+    const routeCoordinates: [number, number][] = [];
+    const stopCoordinates: Array<{ lat: number; lng: number; stop: any; index: number }> = [];
     
     // Add bus current position as start
-    const fallbackRouteCoordinates: LatLngTuple[] = [[bus.lat, bus.lng]];
+    routeCoordinates.push([bus.lat, bus.lng]);
     
     // Collect all stop coordinates
     stops.forEach((stop, index) => {
       let lat, lng;
       
-      const hasValidCoordinates =
-        Number.isFinite(stop.lat) &&
-        Number.isFinite(stop.lng) &&
-        Math.abs(stop.lat) <= 90 &&
-        Math.abs(stop.lng) <= 180 &&
-        !(stop.lat === 0 && stop.lng === 0);
-
-      if (hasValidCoordinates) {
+      if (stop.lat && stop.lng) {
         lat = stop.lat;
         lng = stop.lng;
       } else {
@@ -469,79 +371,68 @@ export function MapView({
       }
       
       stopCoordinates.push({ lat, lng, stop, index });
-      fallbackRouteCoordinates.push([lat, lng]);
+      routeCoordinates.push([lat, lng]);
     });
 
-    let drawnCoordinates: LatLngTuple[] = fallbackRouteCoordinates;
-    let roadRouteRendered = false;
-
-    const waypoints = [[bus.lng, bus.lat], ...stopCoordinates.map((s) => [s.lng, s.lat])];
-
-    // OpenRouteService allows up to 50 coordinates for a directions request.
-    if (waypoints.length >= 2 && waypoints.length <= 50) {
+    // Fetch road routing using OpenRouteService
+    const fetchRoadRoute = async () => {
       try {
-        const response = await fetch(OPENROUTES_DIRECTIONS_URL, {
+        const waypoints = [[bus.lng, bus.lat], ...stopCoordinates.map(s => [s.lng, s.lat])];
+        
+        const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': OPENROUTES_API_KEY
+            'Authorization': '5b3ce3597851110001cf6248daf7f456fc7644888f8e8c5e08c88ce4'
           },
           body: JSON.stringify({
             coordinates: waypoints
           })
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage =
-            errorData?.error?.message ||
-            `OpenRouteService request failed with status ${response.status}`;
-          throw new Error(errorMessage);
-        }
-
-        const data: OpenRouteServiceGeoJsonResponse = await response.json();
-        const roadCoordinatesRaw = data.features?.[0]?.geometry?.coordinates ?? [];
-        const roadCoordinates = roadCoordinatesRaw
-          .filter((coord): coord is [number, number] =>
-            Array.isArray(coord) &&
-            coord.length === 2 &&
-            Number.isFinite(coord[0]) &&
-            Number.isFinite(coord[1])
-          )
-          .map(([lng, lat]) => [lat, lng] as LatLngTuple);
-
-        if (roadCoordinates.length > 1) {
-          drawnCoordinates = roadCoordinates;
-          roadRouteRendered = true;
-
-          L.polyline(roadCoordinates, {
-            color: '#2563eb',
-            weight: 5,
-            opacity: 0.9
-          }).addTo(routeLayer);
+        if (response.ok) {
+          const data = await response.json();
+          const coordinates = data.routes[0].geometry.coordinates;
+          
+          // Draw road route with segments
+          coordinates.forEach((coord: any, i: number) => {
+            if (i < coordinates.length - 1) {
+              const startCoord = coord;
+              const endCoord = coordinates[i + 1];
+              
+              // Check if this segment has been passed by the bus
+              const isPassed = false; // You can implement logic to check if segment is passed
+              
+              L.polyline(
+                [[startCoord[1], startCoord[0]], [endCoord[1], endCoord[0]]],
+                {
+                  color: isPassed ? '#9ca3af' : '#3b82f6', // Gray for passed, blue for active
+                  weight: 5,
+                  opacity: isPassed ? 0.5 : 0.8
+                }
+              ).addTo(routeLayer);
+            }
+          });
         } else {
-          throw new Error('OpenRouteService returned no drivable geometry');
+          // Fallback to straight lines if API fails
+          throw new Error('API failed');
         }
       } catch (error) {
         console.warn('Road routing failed, using straight lines:', error);
+        // Fallback: draw straight lines
+        for (let i = 0; i < routeCoordinates.length - 1; i++) {
+          const isPassed = stopCoordinates[i - 1]?.stop?.passed || false;
+          L.polyline(
+            [routeCoordinates[i], routeCoordinates[i + 1]],
+            {
+              color: isPassed ? '#9ca3af' : '#3b82f6',
+              weight: 5,
+              opacity: isPassed ? 0.5 : 0.8
+            }
+          ).addTo(routeLayer);
+        }
       }
-    } else {
-      console.warn('Too many waypoints for one OpenRouteService request, using fallback line.');
-    }
-
-    if (!roadRouteRendered) {
-      for (let i = 0; i < fallbackRouteCoordinates.length - 1; i++) {
-        const isPassed = stopCoordinates[i - 1]?.stop?.passed || false;
-        L.polyline(
-          [fallbackRouteCoordinates[i], fallbackRouteCoordinates[i + 1]],
-          {
-            color: isPassed ? '#9ca3af' : '#3b82f6',
-            weight: 5,
-            opacity: isPassed ? 0.5 : 0.8
-          }
-        ).addTo(routeLayer);
-      }
-    }
+    };
 
     // Add stop markers
     stopCoordinates.forEach(({ lat, lng, stop, index }) => {
@@ -572,11 +463,14 @@ export function MapView({
         .addTo(routeLayer);
     });
 
+    // Fetch and draw road route
+    fetchRoadRoute();
+
     routeLayerRef.current = routeLayer;
     markersRef.current['routeLayer'] = routeLayer;
 
     // Fit map to show route
-    const bounds = L.latLngBounds(drawnCoordinates);
+    const bounds = L.latLngBounds(routeCoordinates);
     mapInstance.current.fitBounds(bounds, { padding: [50, 50] });
   };
 
@@ -584,7 +478,6 @@ export function MapView({
     setShowBusDetails(false);
     setShowRouteView(false);
     setSelectedBus(null);
-    setRouteMeta(null);
     
     // Remove route layer
     if (routeLayerRef.current && mapInstance.current) {
@@ -595,24 +488,16 @@ export function MapView({
   };
 
   const handleStopToggle = async (stopId: string, currentPassed: boolean) => {
-    if (!selectedBus || !routeMeta?.canMarkPassed) return;
+    if (userRole !== 'driver') return;
     
     try {
-      await apiClient.updateBusStop(selectedBus.id, stopId, !currentPassed);
+      await apiClient.updateBusStop(stopId, !currentPassed);
       setBusStops(prev => prev.map(stop => 
         stop.id === stopId ? { ...stop, passed: !currentPassed } : stop
       ));
       setEditedStops(prev => prev.map(stop => 
         stop.id === stopId ? { ...stop, passed: !currentPassed } : stop
       ));
-      setRouteMeta((prev) => {
-        if (!prev) return prev;
-        const nextPassedStops = prev.stops
-          .map((stop) => stop.id === stopId ? { ...stop, passed: !currentPassed } : stop)
-          .filter((stop) => stop.passed)
-          .map((stop) => stop.id);
-        return { ...prev, passedStops: nextPassedStops };
-      });
       toast.success('Route status updated');
     } catch (error) {
       console.error('Failed to update bus stop:', error);
@@ -645,7 +530,7 @@ export function MapView({
   };
 
   const handleSaveStops = async () => {
-    if (!routeMeta?.editable || !selectedBus) return;
+    if (userRole !== 'driver' || !selectedBus) return;
     
     try {
       await apiClient.updateBusStops(selectedBus.id, editedStops);
@@ -659,7 +544,7 @@ export function MapView({
   };
 
   const handleAddRoute = async () => {
-    if (!routeMeta?.editable || !selectedBus || !newRouteName.trim()) {
+    if (userRole !== 'driver' || !selectedBus || !newRouteName.trim()) {
       toast.error('Please enter a route name');
       return;
     }
@@ -687,8 +572,7 @@ export function MapView({
     setEditedStops(updatedStops);
   };
 
-  const canEditBus = !!routeMeta?.editable;
-  const canMarkPassed = !!routeMeta?.canMarkPassed;
+  const canEditBus = userRole === 'driver' && selectedBus?.id === userId;
 
   const stopsWithTimes = busStops.length > 0 ? generateTripTimes(busStops) : [];
 
@@ -722,7 +606,7 @@ export function MapView({
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">{selectedBus.route}</h3>
-                  <p className="text-sm text-white/80">Route shown on map. Click again to open full schedule.</p>
+                  <p className="text-sm text-white/80">Click again to view full route</p>
                 </div>
               </div>
               <Button 
@@ -904,7 +788,7 @@ export function MapView({
                               </div>
                             </div>
                             
-                            {canMarkPassed && (
+                            {canEditBus && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1042,12 +926,14 @@ export function MapView({
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded border-2 border-white shadow flex items-center justify-center text-xs">🚌</div>
-              <span>Buses (Active/Waiting)</span>
+              <span>Active Buses</span>
             </div>
-            <div className="flex items-center gap-2">
+            {userRole === 'driver' && (
+              <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded border-2 border-white shadow flex items-center justify-center text-[10px]">🚌</div>
                 <span>Passengers Sharing</span>
-            </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1056,11 +942,8 @@ export function MapView({
       <Card>
         <CardContent className="p-4">
           <h4 className="mb-3 font-medium">
-            {'All Locations'}
+            {userRole === 'driver' ? 'All Locations' : 'Available Buses'}
           </h4>
-          <p className="text-xs text-muted-foreground mb-3">
-            {onlineBuses.length} active buses, {waitingBuses.length} waiting buses, {locationShares.length} passenger shares
-          </p>
           <div className="space-y-3">
             {/* Current User Location */}
             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
@@ -1122,22 +1005,18 @@ export function MapView({
               </div>
             </div>
 
-            {/* Active + waiting buses */}
-            {visibleBuses.map((bus) => (
+            {/* Buses */}
+            {onlineBuses.map((bus) => (
               <div 
                 key={bus.id} 
-                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                  bus.isOnline
-                    ? 'bg-purple-50 border-purple-200 hover:bg-purple-100'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                }`}
+                className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors"
                 onClick={() => handleBusClick(bus)}
               >
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded border-2 border-white shadow flex items-center justify-center text-xs">🚌</div>
                   <div>
                     <span className="font-medium">{bus.route}</span>
-                    <p className="text-xs text-muted-foreground">{bus.driverName} - {bus.isOnline ? 'Active' : 'Waiting'}</p>
+                    <p className="text-xs text-muted-foreground">{bus.driverName}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1145,14 +1024,14 @@ export function MapView({
                     {bus.lat.toFixed(4)}, {bus.lng.toFixed(4)}
                   </span>
                   <p className="text-xs text-muted-foreground">
-                    {bus.isOnline ? formatTime(bus.lastUpdated) : `Waiting since ${formatTime(bus.lastUpdated)}`}
+                    {formatTime(bus.lastUpdated)}
                   </p>
                 </div>
               </div>
             ))}
 
-            {/* Passenger sharing (visible to all users) */}
-            {locationShares.map((share) => (
+            {/* Passengers (Driver view only) */}
+            {userRole === 'driver' && locationShares.map((share) => (
               <div key={share.id} className="flex items-center justify-between p-3 bg-cyan-50 rounded-lg border border-cyan-200">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded border-2 border-white shadow flex items-center justify-center text-[10px]">🚌</div>
@@ -1172,10 +1051,10 @@ export function MapView({
               </div>
             ))}
 
-            {visibleBuses.length === 0 && locationShares.length === 0 && (
+            {onlineBuses.length === 0 && userRole === 'passenger' && (
               <div className="text-center py-8 text-muted-foreground">
                 <Bus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No active map locations right now</p>
+                <p>No buses are currently online</p>
               </div>
             )}
           </div>

@@ -6,9 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp';
-import { toast } from 'sonner';
-import { API_BASE_URL } from '../utils/api';
-import { publicAnonKey } from '../utils/supabase/info';
+import { toast } from 'sonner@2.0.3';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -37,10 +35,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     try {
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/send-reset-code`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
 
@@ -106,10 +101,7 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     try {
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/reset-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: verificationCode, newPassword }),
       });
 
@@ -299,4 +291,3 @@ export function ForgotPassword({ onBack, onComplete }: ForgotPasswordProps) {
     </div>
   );
 }
-
