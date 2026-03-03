@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from './components/ui/textarea';
 import { Label } from './components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from './utils/supabase/info';
 import { apiClient } from './utils/api';
@@ -110,12 +110,39 @@ export default function App() {
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
 
+  const clearAuthState = (message?: string) => {
+    setSession(null);
+    setUser(null);
+    apiClient.setAccessToken(null);
+    setCurrentScreen('onboarding');
+    if (message) {
+      toast.error(message);
+    }
+  };
 
   // Check for existing session, restore state, and setup geolocation on mount
   useEffect(() => {
     restoreAppState();
     checkSession();
     requestLocationPermission();
+  }, []);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        clearAuthState();
+        return;
+      }
+
+      if (nextSession) {
+        setSession(nextSession);
+        apiClient.setAccessToken(nextSession.access_token);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Restore app state from localStorage
@@ -341,7 +368,11 @@ export default function App() {
       
       if (sessionError) {
         console.warn('Session error:', sessionError.message);
-        setCurrentScreen('onboarding');
+        if (sessionError.message?.toLowerCase().includes('refresh token')) {
+          clearAuthState('Session expired. Please sign in again.');
+        } else {
+          clearAuthState();
+        }
         setLoading(false);
         return;
       }
@@ -357,10 +388,7 @@ export default function App() {
           setCurrentScreen('main');
         } catch (profileError: any) {
           console.warn('Profile load error:', profileError.message);
-          // If profile fails, clear session and go to onboarding
-          setSession(null);
-          apiClient.setAccessToken(null);
-          setCurrentScreen('onboarding');
+          clearAuthState();
         }
       } else {
         setCurrentScreen('onboarding');
@@ -515,7 +543,7 @@ export default function App() {
       setIsLocationSharing(true);
       
       // Immediately refresh bus locations to show the passenger as a bus
-      await loadBusLocations();
+      await loadPassengerData();
       
       toast.success('Location sharing started!', {
         description: `Valid for 5 hours. You earned 10 coins! Your bus: ${busName}`
@@ -544,7 +572,7 @@ export default function App() {
       localStorage.removeItem('bustracker_sharing_state');
       
       // Immediately refresh bus locations to remove the passenger from bus list
-      await loadBusLocations();
+      await loadPassengerData();
       
       toast.info('Location sharing stopped');
     } catch (error: any) {

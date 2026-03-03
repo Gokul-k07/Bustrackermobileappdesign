@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { UserRole } from '../App';
 import { ForgotPassword } from './ForgotPassword';
+import { apiClient } from '../utils/api';
 
 interface OnboardingFlowProps {
   onComplete: (user: { name: string; email: string; password: string; role: UserRole }) => Promise<void>;
