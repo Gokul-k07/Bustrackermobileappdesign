@@ -1,18 +1,36 @@
 import { Hono } from 'npm:hono'
-import { cors } from 'npm:hono/cors'
 import { logger } from 'npm:hono/logger'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as kv from './kv_store.tsx'
 
-const app = new Hono().basePath('/functions/v1/server')
+const app = new Hono().basePath('/server')
+
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://nextstop.figma.site'
+])
+
+const CORS_ALLOW_HEADERS = 'Authorization, Content-Type, apikey'
+const CORS_ALLOW_METHODS = 'GET, POST, PUT, DELETE, OPTIONS'
 
 // Middleware
-app.use('*', cors({
-  origin: '*',
-  allowHeaders: ['*'],
-  allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE'],
-}))
+app.use('*', async (c, next) => {
+  const origin = c.req.header('origin')
+  const isAllowedOrigin = !!origin && ALLOWED_ORIGINS.has(origin)
+
+  if (isAllowedOrigin) {
+    c.header('Access-Control-Allow-Origin', origin)
+    c.header('Vary', 'Origin')
+    c.header('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS)
+    c.header('Access-Control-Allow-Methods', CORS_ALLOW_METHODS)
+    c.header('Access-Control-Max-Age', '86400')
+  }
+
+  await next()
+})
 app.use('*', logger(console.log))
+app.options('*', (c) => c.body(null, 204))
 
 // Initialize Supabase client
 const supabase = createClient(

@@ -9,6 +9,31 @@
 
   Run `npm run dev` to start the development server.
 
+  ## Server Function Deployment Guardrails
+
+  - Canonical Supabase function slug: `server`
+  - Required deploy entrypoint file: `src/supabase/functions/server/index.ts`
+  - Implementation file: `src/supabase/functions/server/index.tsx`
+  - Hono routing base path in `index.tsx` must remain: `new Hono().basePath('/server')`
+  - Frontend backend base URL contract: `https://arkrhrnslncemnhtyiyp.supabase.co/functions/v1/server`
+  - Mandatory deploy command:
+    `supabase functions deploy server --project-ref arkrhrnslncemnhtyiyp --workdir src --use-api --no-verify-jwt`
+  - CORS allowlist is maintained in `src/supabase/functions/server/index.tsx`
+    and currently includes:
+    `http://localhost:3000`, `http://localhost:5173`, `https://nextstop.figma.site`
+
+  ## CI Auto Deploy
+
+  - Workflow: `.github/workflows/deploy-server-function.yml`
+  - Trigger: push to `main` (when server function files change) or manual dispatch
+  - Required repository secrets:
+    - `SUPABASE_ACCESS_TOKEN`
+    - `SUPABASE_PROJECT_REF` (set this to `arkrhrnslncemnhtyiyp`)
+  - Post-deploy smoke test script:
+    `scripts/smoke-functions.ps1`
+  - Run smoke tests locally:
+    `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-functions.ps1`
+
   # BusTracker - Live Bus Location System
 
 ## NextStop
