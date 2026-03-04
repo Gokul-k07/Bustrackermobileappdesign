@@ -414,45 +414,33 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     const fetchRoadRoute = async () => {
       try {
         const waypoints = [[bus.lng, bus.lat], ...stopCoordinates.map(s => [s.lng, s.lat])];
-        
-        const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': '5b3ce3597851110001cf6248daf7f456fc7644888f8e8c5e08c88ce4'
-          },
-          body: JSON.stringify({
-            coordinates: waypoints
-          })
-        });
 
-        if (response.ok) {
-          const data = await response.json();
-          const coordinates = data.routes[0].geometry.coordinates;
-          
-          // Draw road route with segments
-          coordinates.forEach((coord: any, i: number) => {
-            if (i < coordinates.length - 1) {
-              const startCoord = coord;
-              const endCoord = coordinates[i + 1];
-              
-              // Check if this segment has been passed by the bus
-              const isPassed = false; // You can implement logic to check if segment is passed
-              
-              L.polyline(
-                [[startCoord[1], startCoord[0]], [endCoord[1], endCoord[0]]],
-                {
-                  color: isPassed ? '#9ca3af' : '#3b82f6', // Gray for passed, blue for active
-                  weight: 5,
-                  opacity: isPassed ? 0.5 : 0.8
-                }
-              ).addTo(routeLayer);
-            }
-          });
-        } else {
-          // Fallback to straight lines if API fails
-          throw new Error('API failed');
+        const data = await apiClient.getDirections(waypoints as [number, number][]);
+        const coordinates = data.coordinates;
+
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          throw new Error('No valid route coordinates returned');
         }
+
+        // Draw road route with segments
+        coordinates.forEach((coord: any, i: number) => {
+          if (i < coordinates.length - 1) {
+            const startCoord = coord;
+            const endCoord = coordinates[i + 1];
+            
+            // Check if this segment has been passed by the bus
+            const isPassed = false; // You can implement logic to check if segment is passed
+            
+            L.polyline(
+              [[startCoord[1], startCoord[0]], [endCoord[1], endCoord[0]]],
+              {
+                color: isPassed ? '#9ca3af' : '#3b82f6', // Gray for passed, blue for active
+                weight: 5,
+                opacity: isPassed ? 0.5 : 0.8
+              }
+            ).addTo(routeLayer);
+          }
+        });
       } catch (error) {
         console.warn('Road routing failed, using straight lines:', error);
         // Fallback: draw straight lines

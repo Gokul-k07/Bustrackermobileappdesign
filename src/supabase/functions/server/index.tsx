@@ -39,7 +39,7 @@ async function authenticateRequest(request: Request) {
 async function initializeDefaultBuses() {
   const existingBuses = await kv.get('available_buses')
   if (!existingBuses) {
-    const defaultBusNumbers = [30, 29, "31/56", 36, 35, 32, 69, 73, 72, 74, 20, "23/22", 28, 25, 26, 27, 45, 47, 38, 51, 34, "33/39", 53, 54, 44, 40, 59, 42, 43, 46, 57, 48, 49, 52, 41, 55, 50, 58, 60, 61]
+    const defaultBusNumbers = [30, 29, 31, 56, 36, 35, 32, 69, 73, 72, 74, 20, 22, 23, 28, 25, 26, 27, 45, 47, 38, 51, 34, 33, 39, 53, 54, 44, 40, 59, 42, 43, 46, 57, 48, 49, 52, 41, 55, 50, 58, 60, 61]
     const buses = defaultBusNumbers.map(num => `PSNA-${num}`)
     await kv.set('available_buses', buses)
     return buses
@@ -58,7 +58,7 @@ const DEFAULT_BUS_ROUTES = {
 "PSNA-38": ["BATALAGUNDU BUS STAND", "POLICE STATION", "KALIAMMAN KOVIL", "KATTASPATHIRI", "INDIAN OIL", "STATE BANK COLONY", "A.PRIVU", "LAKSHMI PURAM", "PSNACET"],
 "PSNA-51": ["GURU THEATRE", "THEEKKATHIR", "FATHIMA COLLEGE", "KARISAL KULAM", "VILANGUDI", "VISTHARA APARTMENT", "MADHURAI RADHA", "PARAVAI", "POWER HOUSE", "SAMAYANALLUR", "AYYAMKOΟΤΑΙ", "PSNACET"],
 "PSNA-34": ["PERIYAKULAM BHARATHIPURAM", "PERIYAKULAM GANDHI STATUE", "JAYA THEATRE", "RMTC SET", "DEVATHANAPATTY", "KOVILPATTY", "GATT ROAD", "SENGULAM PIRIVU", "MEENATCHIPURAM", "OLD BATTALAGUNDU", "MEENATCHI HOTEL", "MUTHALAPURAM", "OTTUPPATTY", "SALAI PUDUR", "SITHAYANKOTTAI PIRIVU", "PSNACET"],
-"PSNA-33/39": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
+"PSNA-33": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
 "PSNA-53": ["VIRAGANOOR RING ROAD", "ILANALLU R (VIRAGANOOR)", "NIRMALA SCHOOL", "SANTHA PETTAI", "ICICI BANK", "ALANGAR THEATRE", "KEELAVASAAL", "PSNACET"],
 "PSNA-54": ["SIMMAKKAL", "THAMILSANGAM ROAD(BELL HOTEL)", "MADURA COATS", "JAIL ROAD", "MATHI THEATRE", "AGARWAL HOSPITAL-AARAPALAYAM", "PSNACET"],
 "PSNA-44": ["KADACHANENTHAL", "SURYA NAGAR", "SERVEYER COLONY", "MOONDRU MAVADI", "ALAGAR NAGAR", "K PUDUR", "I.T. STOP", "THAMARAI THOTTI", "OUT POST", "THALLAKULAM", "THAMUKKAM", "GORIPALAYAM", "PSNACET"],
@@ -83,10 +83,13 @@ const DEFAULT_BUS_ROUTES = {
 "PSNA-74": ["PATTIVEERAN PATTY", "ANNA NAGAR", "SAVADI", "RADIO POTTAL", "GANDHI PURAM", "THEVARAN PATTY PIRIVU", "VEPPAMARAM", "ARASAMARAM", "GANESHAPURAM", "AATHUR TALUK OFFICE", "AATHUR BUS STAND", "S PARAI PATTY", "DHARUMATHUPATTY", "KANNIVADI", "AALATHURAN PATTY", "PUDHUPATTY", "REDDIYAR CHATRAM", "PSNACET"],
 "PSNA-30": ["MURUGABHAVANAM", "AYYANGULAM", "SAKTHI TALKIES", "AARIYABHAVAN", "VANI VILAS", "JEGANATH HOSPITAL", "SONA TOWER", "AMMA MESS", "12TH CROSS", "9TH CROSS", "8TH CROSS", "7TH CROSS", "WATER TANK", "4TH CROSS", "MVM COLLEGE", "ANJALI BYE PASS", "PSNACET"],
 "PSNA-20": ["ATHIKARIPATTI", "SILUVATHUR", "PUGAIYELAIPATTI PIRIVU", "PANNAI PATTY PIRIVU", "RAJAKKA PATTY", "M.M.KOVILUR PIRIVU (2)", "SOUNDRARAJA AIRPORT", "UTHANAMPATTY PRIVU", "BALAKRISHNAPURAM", "SMBM SCHOOL", "PSNACET"],
-"PSNA-23/22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTY", "PONNAGARAM", "ITI", "PSNACET"],
+"PSNA-23": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTY", "PONNAGARAM", "ITI", "PSNACET"],
 "PSNA-28": ["VADIPATTI", "VADIPATTI CHURCH", "PANDIYARAJAPURAM PRIVU", "PALLAPATTI PRIVU", "AMMAYANAYAKKANUR", "KODAIROAD", "TOLL GATE", "KOZHINJIPATTI PIRIVU", "KAMALAPURAM", "AMBATHURAI", "AANGANEYAR KOVIL", "PSNACET"],
 "PSNA-29": ["BALAKRISHNAPURAM", "SMBM SCHOOL", "SP OFFICE", "DGL SCAN", "DGL BUS STAND", "DGL G.H", "AARIYABHAVAN", "PALANI BYE.PASS", "PSNACET"],
-"PSNA-31/56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
+"PSNA-31": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
+"PSNA-56": ["KULLANAMPATTY", "II RMTC", "VIJAY THEATRE", "NAGAL NAGAR", "ANNAMALAYAR SCHOOL", "BHARATH!PURAM", "BHUVANESWARI AMMAN KOVIL", "METTUPATTY", "BEGAMBUR", "PARAPATTI K", "A.P NAGAR", "PSNACET"],
+"PSNA-22": ["NATHAM KOVILPATTI", "NATHAM BUS STAND", "ANNA NAGAR", "UZUPAKUDI", "OTHAKADAI", "KANAVAPATTY", "GOPAL PATTY", "KANNIYAPURAM", "METTUKADAI", "SANARPATTY", "KOSAVAPATTY", "VALAKKAPATTY", "PONNAGARAM", "ITI", "PSNACET"],
+"PSNA-39": ["PALANI NEIKARAPATTY", "ALAGAPURI", "VANDI VAYKKAL", "KARAMADAI", "BALAJI MILL", "SAMY THEATRE", "RANAKALI AMMAN KOVIL", "PALANI BUS STAND", "T.B", "APA COLLEGE", "THIRU NAGAR", "HOUSING BOARD", "ITO SCHOOL", "OLD AYAKUDI", "NEW AYAKUDI", "KANAKKANPATTY", "CHATRAPATTY", "VIRUPPATCHI", "RELIANCE PETROL PUNK / RTO OFFICE", "PSNACET"],
 "PSNA-36": ["CHINNALAPATTY", "POONCHOLAI", "CHINNALAPATTY PIRIVU", "KEELAKOTTAI BYE-PASS", "CHETTIYAPATTY PIRIVU", "KALIKAM PATTY PIRIVU", "POKUVARATHU NAGAR", "VELLODU PIRIVU", "PANJAM PATTY PIRIVU (EAST)", "COFFEE SHOP", "ANNAMALAYAR MILL", "THOMAYARPURAM", "PSNACET"],
 "PSNA-35": ["SMBM SCHOOL", "SP OFFICE", "SP OFFICE", "DGL BUS STAND", "AARIYABHAVAN", "VANI VILAS SIGNAL", "PALANI BYE-PASS", "PSNACET"],
 "PSNA-32": ["MA.MU.KOVILUR PIRIVU", "SEELAPADI BYE.PASS", "NGA MILL", "NGO COLONY", "UZAVAR SANTHAI", "CITY HOSPITAL", "PSNACET"]
@@ -128,6 +131,62 @@ async function getDefaultRoutesForBus(busName: string) {
 // Routes
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Proxy road directions to avoid browser CORS issues with OpenRouteService
+app.post('/route/directions', async (c) => {
+  try {
+    const { coordinates } = await c.req.json()
+
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      return c.json({ error: 'At least 2 coordinates are required' }, 400)
+    }
+
+    const validCoordinates = coordinates.every((point: any) =>
+      Array.isArray(point) &&
+      point.length === 2 &&
+      Number.isFinite(point[0]) &&
+      Number.isFinite(point[1])
+    )
+
+    if (!validCoordinates) {
+      return c.json({ error: 'Invalid coordinates format' }, 400)
+    }
+
+    const orsApiKey =
+      Deno.env.get('OPENROUTESERVICE_API_KEY') ||
+      '5b3ce3597851110001cf6248daf7f456fc7644888f8e8c5e08c88ce4'
+
+    const orsResponse = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': orsApiKey
+      },
+      body: JSON.stringify({ coordinates })
+    })
+
+    if (!orsResponse.ok) {
+      const orsErrorText = await orsResponse.text().catch(() => '')
+      console.log('OpenRouteService error:', orsResponse.status, orsErrorText)
+      return c.json({ error: 'Failed to fetch route directions' }, 502)
+    }
+
+    const orsData = await orsResponse.json()
+    const routeCoordinates = orsData?.routes?.[0]?.geometry?.coordinates
+
+    if (!Array.isArray(routeCoordinates)) {
+      return c.json({ error: 'No route geometry returned' }, 502)
+    }
+
+    return c.json({
+      success: true,
+      coordinates: routeCoordinates
+    })
+  } catch (error) {
+    console.log('Route directions proxy error:', error)
+    return c.json({ error: 'Failed to process route directions request' }, 500)
+  }
 })
 
 // User registration
@@ -1138,7 +1197,7 @@ app.get('/admin/users', async (c) => {
 
     // Get all users from KV store
     const allUsers = await kv.getByPrefix('user:')
-    \n    // Sort by creation date (newest first)
+    // Sort by creation date (newest first)
     const sortedUsers = allUsers.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime()
       const dateB = new Date(b.createdAt || 0).getTime()

@@ -199,6 +199,13 @@ class ApiClient {
     });
   }
 
+  async getDirections(coordinates: [number, number][]) {
+    return this.request('/route/directions', {
+      method: 'POST',
+      body: JSON.stringify({ coordinates }),
+    });
+  }
+
   // Health check
   async health() {
     return this.request('/health');
