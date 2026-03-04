@@ -48,8 +48,7 @@ class ApiClient {
     
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.accessToken || publicAnonKey}`,
-      'apikey': publicAnonKey, // Required by Supabase for functions
+      'Authorization': `Bearer ${this.accessToken}`,
       ...options.headers,
     };
 
@@ -69,7 +68,7 @@ class ApiClient {
       return await response.json();
     } catch (error: any) {
       // Log more detailed info for debugging
-      console.error(`Fetch error for ${url}:`, error.message);
+      console.error(`❌ Fetch error for ${url}:`, error.message);
       
       if (error.message === 'Failed to fetch') {
         throw new Error('Could not connect to the server. Please check your internet connection and try again.');

@@ -40,8 +40,57 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
   const [editedStops, setEditedStops] = useState<BusStop[]>([]);
   const [newRouteName, setNewRouteName] = useState('');
   const [isAddingRoute, setIsAddingRoute] = useState(false);
+  const [busSearchQuery, setBusSearchQuery] = useState('');
   
   const onlineBuses = busLocations.filter(bus => bus.isOnline);
+
+  // Helper function to calculate distance between two points
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Helper function to find the next bus stop
+  const getNextBusStop = (bus: BusLocation): string => {
+    if (!bus.busStops || bus.busStops.length === 0) {
+      return 'No stops available';
+    }
+
+    // Find the first stop that hasn't been passed yet
+    const nextStop = bus.busStops.find(stop => !stop.passed && stop.lat !== 0 && stop.lng !== 0);
+    
+    if (nextStop) {
+      return nextStop.name;
+    }
+
+    // If all stops are passed or no valid stops, find the nearest stop
+    const stopsWithDistance = bus.busStops
+      .filter(stop => stop.lat !== 0 && stop.lng !== 0)
+      .map(stop => ({
+        ...stop,
+        distance: calculateDistance(bus.lat, bus.lng, stop.lat, stop.lng)
+      }))
+      .sort((a, b) => a.distance - b.distance);
+
+    if (stopsWithDistance.length > 0) {
+      return stopsWithDistance[0].name;
+    }
+
+    // Fallback to first stop name
+    return bus.busStops[0]?.name || 'Unknown';
+  };
+
+  // Filter buses based on search query
+  const filteredBuses = onlineBuses.filter(bus => 
+    bus.route.toLowerCase().includes(busSearchQuery.toLowerCase()) ||
+    bus.driverName.toLowerCase().includes(busSearchQuery.toLowerCase())
+  );
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -109,19 +158,6 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     const speed = distance / timeDiff;
     
     return Math.round(speed);
-  };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    // Haversine formula for distance in km
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
   };
 
   const getTripCount = () => {
@@ -944,6 +980,19 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
           <h4 className="mb-3 font-medium">
             {userRole === 'driver' ? 'All Locations' : 'Available Buses'}
           </h4>
+          
+          {/* Search Field */}
+          {onlineBuses.length > 0 && (
+            <div className="mb-3">
+              <Input
+                placeholder="Search buses by name or driver..."
+                value={busSearchQuery}
+                onChange={(e) => setBusSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          )}
+
           <div className="space-y-3">
             {/* Current User Location */}
             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
@@ -1006,7 +1055,7 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
             </div>
 
             {/* Buses */}
-            {onlineBuses.map((bus) => (
+            {filteredBuses.map((bus) => (
               <div 
                 key={bus.id} 
                 className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors"
@@ -1020,8 +1069,8 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm text-muted-foreground font-mono">
-                    {bus.lat.toFixed(4)}, {bus.lng.toFixed(4)}
+                  <span className="text-sm font-medium text-purple-700">
+                    Next: {getNextBusStop(bus)}
                   </span>
                   <p className="text-xs text-muted-foreground">
                     {formatTime(bus.lastUpdated)}
@@ -1050,6 +1099,13 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
                 </div>
               </div>
             ))}
+
+            {filteredBuses.length === 0 && onlineBuses.length > 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Bus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No buses match your search</p>
+              </div>
+            )}
 
             {onlineBuses.length === 0 && userRole === 'passenger' && (
               <div className="text-center py-8 text-muted-foreground">

@@ -4,7 +4,7 @@ import { logger } from 'npm:hono/logger'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as kv from './kv_store.tsx'
 
-const app = new Hono()
+const app = new Hono().basePath('/functions/v1/server')
 
 // Middleware
 app.use('*', cors({
@@ -1138,7 +1138,7 @@ app.get('/admin/users', async (c) => {
 
     // Get all users from KV store
     const allUsers = await kv.getByPrefix('user:')
-    // Sort by creation date (newest first)
+    \n    // Sort by creation date (newest first)
     const sortedUsers = allUsers.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime()
       const dateB = new Date(b.createdAt || 0).getTime()
@@ -1156,20 +1156,5 @@ app.get('/admin/users', async (c) => {
   }
 })
 
-// Start the server.
-// Normalize possible gateway prefixes so routes like /profile always resolve.
-const FUNCTION_PATH_PREFIXES = ['/server', '/functions/v1/server']
-
-Deno.serve((request: Request) => {
-  const url = new URL(request.url)
-
-  for (const prefix of FUNCTION_PATH_PREFIXES) {
-    if (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`)) {
-      url.pathname = url.pathname.slice(prefix.length) || '/'
-      request = new Request(url.toString(), request)
-      break
-    }
-  }
-
-  return app.fetch(request)
-})
+// Start the server
+Deno.serve(app.fetch)
