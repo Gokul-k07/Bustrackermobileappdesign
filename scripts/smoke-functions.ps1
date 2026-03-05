@@ -20,11 +20,26 @@ function Get-HeaderValue {
     [Parameter(Mandatory = $true)][string]$Name
   )
 
-  $value = $Headers[$Name]
-  if (-not $value) {
-    $value = $Headers[$Name.ToLower()]
+  try {
+    if ($Headers.Contains($Name)) {
+      return ($Headers.GetValues($Name) | Select-Object -First 1)
+    }
+
+    $lower = $Name.ToLower()
+    if ($Headers.Contains($lower)) {
+      return ($Headers.GetValues($lower) | Select-Object -First 1)
+    }
+
+    return $null
   }
-  return $value
+  catch {
+    foreach ($key in $Headers.Keys) {
+      if ($key.ToLower() -eq $Name.ToLower()) {
+        return $Headers[$key]
+      }
+    }
+    return $null
+  }
 }
 
 function Invoke-RequestRaw {
