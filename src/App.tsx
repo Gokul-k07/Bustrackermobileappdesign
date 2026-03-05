@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send, Loader2 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -78,6 +78,8 @@ const supabase = createClient(
 );
 
 export default function App() {
+  const initRunIdRef = useRef(0);
+
   // App state
   const [currentScreen, setCurrentScreen] = useState<'onboarding' | 'roleSelection' | 'main'>('onboarding');
   const [user, setUser] = useState<User | null>(null);
@@ -111,11 +113,146 @@ export default function App() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
 
 
-  // Check for existing session, restore state, and setup geolocation on mount
+  const resolveRoleFromSession = (authSession: any): UserRole => {
+    const sessionRole = authSession?.user?.user_metadata?.role;
+    if (sessionRole === 'driver' || sessionRole === 'passenger' || sessionRole === 'admin') {
+      return sessionRole;
+    }
+    return null;
+  };
+
+  const resetClientState = () => {
+    setSession(null);
+    setUser(null);
+    setCurrentScreen('onboarding');
+    setIsOnline(false);
+    setIsLocationSharing(false);
+    setOtps([]);
+    setLocationShares([]);
+    setBusLocations([]);
+    apiClient.setAccessToken(null);
+  };
+
+  const initializeAuthenticatedApp = async (authSession: any) => {
+    const initRunId = ++initRunIdRef.current;
+
+    if (!authSession) {
+      resetClientState();
+      if (initRunId === initRunIdRef.current) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
+      setSession(authSession);
+      apiClient.setAccessToken(authSession.access_token);
+
+      const sessionRole = resolveRoleFromSession(authSession);
+
+      const [profileData, busesData, availableBusesData] = await Promise.all([
+        apiClient.getProfile(),
+        apiClient.getBuses().catch(() => ({ buses: [] })),
+        apiClient.getAvailableBuses().catch(() => ({ buses: [] }))
+      ]);
+
+      if (initRunId !== initRunIdRef.current) return;
+
+      const profileUser = profileData?.user || {};
+      const effectiveRole = sessionRole || profileUser.role || null;
+      const mergedUser: User = {
+        id: profileUser.id || authSession.user.id,
+        name: profileUser.name || authSession.user.email?.split('@')[0] || 'User',
+        email: profileUser.email || authSession.user.email || '',
+        role: effectiveRole,
+        coins: profileUser.coins || 0
+      };
+
+      setUser(mergedUser);
+      setCurrentScreen('main');
+
+      const onlineBuses = busesData?.buses || [];
+      setBusLocations(onlineBuses);
+      setAvailableBuses(availableBusesData?.buses || []);
+
+      if (effectiveRole === 'driver') {
+        const [otpsData, sharesData] = await Promise.all([
+          apiClient.getDriverOTPs().catch(() => ({ otps: [] })),
+          apiClient.getLocationShares().catch(() => ({ shares: [] }))
+        ]);
+
+        if (initRunId !== initRunIdRef.current) return;
+
+        setOtps(otpsData.otps || []);
+        setLocationShares(sharesData.shares || []);
+        setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
+        setIsLocationSharing(false);
+      } else if (effectiveRole === 'passenger') {
+        setOtps([]);
+        setLocationShares([]);
+        setIsOnline(false);
+        setIsLocationSharing(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
+      } else {
+        setOtps([]);
+        setLocationShares([]);
+        setIsOnline(false);
+        setIsLocationSharing(false);
+      }
+    } catch (error: any) {
+      console.warn('Authentication initialization failed:', error.message || error);
+      if (initRunId === initRunIdRef.current) {
+        resetClientState();
+      }
+    } finally {
+      if (initRunId === initRunIdRef.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Check for existing session, restore state, setup geolocation, and listen for auth changes
   useEffect(() => {
+    let isMounted = true;
+
     restoreAppState();
-    checkSession();
     requestLocationPermission();
+
+    const init = async () => {
+      try {
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+
+        if (!isMounted) return;
+
+        if (sessionError) {
+          console.warn('Session error:', sessionError.message);
+          resetClientState();
+          setLoading(false);
+          return;
+        }
+
+        await initializeAuthenticatedApp(currentSession);
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.warn('Session bootstrap error:', error.message || error);
+        resetClientState();
+        setLoading(false);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Defer async work to avoid auth callback re-entrancy issues
+      setTimeout(() => {
+        if (!isMounted) return;
+        initializeAuthenticatedApp(newSession);
+      }, 0);
+    });
+
+    init();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Restore app state from localStorage
@@ -125,8 +262,6 @@ export default function App() {
       if (savedState) {
         const state = JSON.parse(savedState);
         if (state.activeTab) setActiveTab(state.activeTab);
-        if (state.isOnline) setIsOnline(state.isOnline);
-        if (state.isLocationSharing) setIsLocationSharing(state.isLocationSharing);
       }
     } catch (error) {
       console.error('Failed to restore app state:', error);
@@ -138,8 +273,6 @@ export default function App() {
     try {
       const state = {
         activeTab,
-        isOnline,
-        isLocationSharing,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('bustracker_app_state', JSON.stringify(state));
@@ -153,7 +286,7 @@ export default function App() {
     if (user) {
       saveAppState();
     }
-  }, [activeTab, isOnline, isLocationSharing]);
+  }, [activeTab, user?.id]);
 
   const loadAvailableBuses = async () => {
     try {
@@ -242,11 +375,44 @@ export default function App() {
   useEffect(() => {
     if (session && user) {
       apiClient.setAccessToken(session.access_token);
-      
-      // Initial data load
-      loadUserData();
-      loadAvailableBuses(); // Load buses after authentication
-      
+
+      const refreshRealtimeData = async () => {
+        try {
+          const busesData = await apiClient.getBuses();
+          const onlineBuses = busesData.buses || [];
+          setBusLocations(onlineBuses);
+
+          if (user.role === 'driver') {
+            const [otpsData, sharesData] = await Promise.all([
+              apiClient.getDriverOTPs().catch(() => ({ otps: [] })),
+              apiClient.getLocationShares().catch(() => ({ shares: [] }))
+            ]);
+
+            setOtps(otpsData.otps || []);
+            setLocationShares(sharesData.shares || []);
+            setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
+          } else if (user.role === 'passenger') {
+            setOtps([]);
+            setLocationShares([]);
+            setIsOnline(false);
+            setIsLocationSharing(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
+          } else {
+            setOtps([]);
+            setLocationShares([]);
+            setIsOnline(false);
+            setIsLocationSharing(false);
+          }
+        } catch (error: any) {
+          if (error.message && !error.message.includes('Authentication failed')) {
+            console.warn('Failed to refresh realtime data:', error.message);
+          }
+        }
+      };
+
+      // Initial data load for this auth context
+      refreshRealtimeData();
+      loadAvailableBuses();
+
       // Set up session refresh every 50 minutes (tokens expire after 60 minutes)
       const refreshInterval = setInterval(async () => {
         try {
@@ -262,20 +428,14 @@ export default function App() {
       }, 50 * 60 * 1000); // Refresh every 50 minutes
       
       // Set up periodic updates for real-time location display
-      const interval = setInterval(() => {
-        if (user.role === 'driver') {
-          loadDriverData();
-        } else if (user.role === 'passenger') {
-          loadPassengerData();
-        }
-      }, 1000); // Update every second for real-time tracking
+      const interval = setInterval(refreshRealtimeData, 1000);
 
       return () => {
         clearInterval(interval);
         clearInterval(refreshInterval);
       };
     }
-  }, [session, user]);
+  }, [session?.access_token, user?.id, user?.role]);
 
   // Set up location updates for active sharing (passengers) and drivers online
   // Updates every second for real-time tracking, even when app is in background
@@ -352,82 +512,6 @@ export default function App() {
     }
   }, [isLocationSharing, isOnline, locationPermissionGranted, currentLocation, user]);
 
-  const checkSession = async () => {
-    try {
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.warn('Session error:', sessionError.message);
-        setCurrentScreen('onboarding');
-        setLoading(false);
-        return;
-      }
-      
-      if (currentSession) {
-        setSession(currentSession);
-        apiClient.setAccessToken(currentSession.access_token);
-        
-        try {
-          // Load user profile
-          const profileData = await apiClient.getProfile();
-          setUser(profileData.user);
-          setCurrentScreen('main');
-        } catch (profileError: any) {
-          console.warn('Profile load error:', profileError.message);
-          // If profile fails, clear session and go to onboarding
-          setSession(null);
-          apiClient.setAccessToken(null);
-          setCurrentScreen('onboarding');
-        }
-      } else {
-        setCurrentScreen('onboarding');
-      }
-    } catch (error: any) {
-      console.warn('Session check error:', error.message || 'Unknown error');
-      setCurrentScreen('onboarding');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUserData = async () => {
-    try {
-      const profileData = await apiClient.getProfile();
-      setUser(profileData.user);
-    } catch (error: any) {
-      console.warn('Failed to load user data:', error.message || 'Unknown error');
-    }
-  };
-
-  const loadDriverData = async () => {
-    try {
-      const [otpsData, sharesData] = await Promise.all([
-        apiClient.getDriverOTPs(),
-        apiClient.getLocationShares()
-      ]);
-      
-      setOtps(otpsData.otps || []);
-      setLocationShares(sharesData.shares || []);
-    } catch (error: any) {
-      // Don't log errors if user just switched roles or logged out
-      if (error.message && !error.message.includes('Authentication failed')) {
-        console.warn('Failed to load driver data:', error.message);
-      }
-    }
-  };
-
-  const loadPassengerData = async () => {
-    try {
-      const busesData = await apiClient.getBuses();
-      setBusLocations(busesData.buses || []);
-    } catch (error: any) {
-      // Don't log errors if user just switched roles or logged out
-      if (error.message && !error.message.includes('Authentication failed')) {
-        console.warn('Failed to load passenger data:', error.message);
-      }
-    }
-  };
-
   const loadBusLocations = async () => {
     try {
       const busesData = await apiClient.getBuses();
@@ -440,7 +524,7 @@ export default function App() {
   const handleCompleteOnboarding = async (userData: { name: string; email: string; password: string; role: UserRole }) => {
     try {
       // Register user
-      const registerData = await apiClient.register(userData);
+      await apiClient.register(userData);
       
       // Sign them in
       const { data: signInData, error } = await supabase.auth.signInWithPassword({
@@ -452,13 +536,7 @@ export default function App() {
         throw new Error('Failed to sign in after registration');
       }
 
-      setSession(signInData.session);
-      apiClient.setAccessToken(signInData.session?.access_token || '');
-      
-      // Load profile
-      const profileData = await apiClient.getProfile();
-      setUser(profileData.user);
-      setCurrentScreen('main');
+      await initializeAuthenticatedApp(signInData.session);
       
       toast.success('Account created successfully!');
     } catch (error: any) {
@@ -484,12 +562,7 @@ export default function App() {
         throw new Error('Invalid email or password');
       }
 
-      setSession(data.session);
-      apiClient.setAccessToken(data.session?.access_token || '');
-      
-      const profileData = await apiClient.getProfile();
-      setUser(profileData.user);
-      setCurrentScreen('main');
+      await initializeAuthenticatedApp(data.session);
       
       toast.success('Signed in successfully!');
     } catch (error: any) {
@@ -505,10 +578,7 @@ export default function App() {
     
     try {
       await supabase.auth.signOut();
-      setSession(null);
-      setUser(null);
-      apiClient.setAccessToken(null);
-      setCurrentScreen('onboarding');
+      resetClientState();
       
       toast.success('Signed out successfully');
     } catch (error) {
