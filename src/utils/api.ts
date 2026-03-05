@@ -1,4 +1,4 @@
-import { projectId, publicAnonKey } from './supabase/info';
+import { projectId } from './supabase/info';
 
 const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/server`;
 
@@ -6,6 +6,26 @@ export interface ApiResponse<T = any> {
   success?: boolean;
   error?: string;
   data?: T;
+}
+
+export interface ChatbotResponse {
+  success: boolean;
+  reply: string;
+  mapLink?: string;
+  response?: string;
+  timestamp?: string;
+}
+
+export interface RouteStopsResponse {
+  success: boolean;
+  route: {
+    busName: string;
+    isOnline: boolean;
+    busId: string | null;
+    lat: number | null;
+    lng: number | null;
+    busStops: any[];
+  };
 }
 
 class ApiClient {
@@ -46,11 +66,14 @@ class ApiClient {
     const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${path}`;
     
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.accessToken}`,
-      ...options.headers,
+      ...((options.headers as Record<string, string>) || {}),
     };
+
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
 
     try {
       const response = await fetch(url, {
@@ -203,6 +226,18 @@ class ApiClient {
     return this.request('/route/directions', {
       method: 'POST',
       body: JSON.stringify({ coordinates }),
+    });
+  }
+
+  async getRouteStopsByBusName(busName: string): Promise<RouteStopsResponse> {
+    const encodedBusName = encodeURIComponent(busName.trim());
+    return this.request(`/route/stops?busName=${encodedBusName}`);
+  }
+
+  async chatbot(message: string): Promise<ChatbotResponse> {
+    return this.request('/chatbot', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
     });
   }
 

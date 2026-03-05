@@ -18,6 +18,7 @@ interface MapViewProps {
   userId?: string;
   isLocationSharing?: boolean;
   locationPermissionGranted?: boolean;
+  highlightBusRouteName?: string | null;
 }
 
 declare global {
@@ -26,7 +27,16 @@ declare global {
   }
 }
 
-export function MapView({ busLocations, locationShares, currentLocation, userRole, userId, isLocationSharing, locationPermissionGranted }: MapViewProps) {
+export function MapView({
+  busLocations,
+  locationShares,
+  currentLocation,
+  userRole,
+  userId,
+  isLocationSharing,
+  locationPermissionGranted,
+  highlightBusRouteName
+}: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
@@ -34,6 +44,7 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
   const routingControlRef = useRef<any>(null);
   const lastRouteUpdateRef = useRef<number>(0);
   const lastWaypointSignatureRef = useRef<string>('');
+  const lastHighlightedRouteRef = useRef<string>('');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
@@ -47,6 +58,11 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
   const ROUTE_REFRESH_INTERVAL_MS = 3000;
   
   const onlineBuses = busLocations.filter(bus => bus.isOnline);
+
+  const normalizeBusRouteName = (value: string | null | undefined) => (value || '').trim().toUpperCase();
+
+  const isValidCoordinate = (lat: number, lng: number) =>
+    Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
 
   // Helper function to calculate distance between two points
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -396,25 +412,91 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
 
   }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
 
+  const loadBusStopsForBus = async (bus: BusLocation): Promise<BusStop[]> => {
+    try {
+      const response = await apiClient.getBusStops(bus.id);
+      return response.busStops || bus.busStops || [];
+    } catch (error) {
+      console.error('Failed to load bus stops:', error);
+      return bus.busStops || [];
+    }
+  };
+
+  const buildFallbackBusForRoute = (
+    busName: string,
+    routeStops: BusStop[],
+    routeMeta?: { isOnline?: boolean; busId?: string | null; lat?: number | null; lng?: number | null }
+  ): BusLocation => {
+    const firstValidStop = routeStops.find((stop) => isValidCoordinate(stop.lat, stop.lng));
+    const routeIsOnline = Boolean(routeMeta?.isOnline);
+    const hasLiveCoordinates =
+      typeof routeMeta?.lat === 'number' &&
+      typeof routeMeta?.lng === 'number' &&
+      isValidCoordinate(routeMeta.lat, routeMeta.lng);
+
+    return {
+      id: routeMeta?.busId || `offline-route-${busName}`,
+      driverName: routeIsOnline ? 'Live Bus' : 'Offline Route',
+      route: busName,
+      lat: hasLiveCoordinates ? (routeMeta?.lat as number) : (firstValidStop?.lat ?? currentLocation.lat),
+      lng: hasLiveCoordinates ? (routeMeta?.lng as number) : (firstValidStop?.lng ?? currentLocation.lng),
+      isOnline: routeIsOnline,
+      lastUpdated: new Date().toISOString(),
+      busStops: routeStops
+    };
+  };
+
+  const highlightRouteFromBusName = async (busName: string) => {
+    const normalizedName = normalizeBusRouteName(busName);
+    if (!normalizedName) return;
+
+    const onlineBus = onlineBuses.find(
+      (bus) => normalizeBusRouteName(bus.route) === normalizedName
+    );
+
+    if (onlineBus) {
+      const stops = await loadBusStopsForBus(onlineBus);
+      setSelectedBus(onlineBus);
+      setBusStops(stops);
+      setEditedStops(stops);
+      setShowBusDetails(false);
+      setShowRouteView(true);
+      drawRoutePath(onlineBus, stops, true);
+      return;
+    }
+
+    try {
+      const response = await apiClient.getRouteStopsByBusName(busName);
+      const routeStops = (response.route?.busStops || []) as BusStop[];
+
+      if (routeStops.length === 0) {
+        toast.error(`No route stops configured for ${busName}`);
+        return;
+      }
+
+      const routeBus = buildFallbackBusForRoute(busName, routeStops, response.route);
+      setSelectedBus(routeBus);
+      setBusStops(routeStops);
+      setEditedStops(routeStops);
+      setShowBusDetails(false);
+      setShowRouteView(true);
+      drawRoutePath(routeBus, routeStops, true);
+    } catch (error) {
+      console.error('Failed to highlight route by bus name:', error);
+      toast.error(`Could not load route for ${busName}`);
+    }
+  };
+
   const handleBusClick = async (bus: BusLocation) => {
     // First click: Show bus details
     if (!selectedBus || selectedBus.id !== bus.id) {
       setSelectedBus(bus);
       setShowBusDetails(true);
       setShowRouteView(false);
-      
-      // Load bus stops
-      try {
-        const response = await apiClient.getBusStops(bus.id);
-        const stops = response.busStops || bus.busStops || [];
-        setBusStops(stops);
-        setEditedStops(stops);
-      } catch (error) {
-        console.error('Failed to load bus stops:', error);
-        const stops = bus.busStops || [];
-        setBusStops(stops);
-        setEditedStops(stops);
-      }
+
+      const stops = await loadBusStopsForBus(bus);
+      setBusStops(stops);
+      setEditedStops(stops);
     } else {
       // Second click: Show route view with path on map
       setShowBusDetails(false);
@@ -560,12 +642,18 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
       });
     }
 
-    // Route path order: starting point -> live bus -> all stops/destination
-    const waypointLatLngs = [
-      L.latLng(currentLocation.lat, currentLocation.lng),
-      L.latLng(bus.lat, bus.lng),
-      ...stopCoordinates.map(({ lat, lng }) => L.latLng(lat, lng))
-    ];
+    // Route path order: starting point -> live bus (if online) -> all stops/destination
+    const waypointLatLngs = [L.latLng(currentLocation.lat, currentLocation.lng)];
+
+    if (bus.isOnline && isValidCoordinate(bus.lat, bus.lng)) {
+      waypointLatLngs.push(L.latLng(bus.lat, bus.lng));
+    }
+
+    waypointLatLngs.push(...stopCoordinates.map(({ lat, lng }) => L.latLng(lat, lng)));
+
+    if (waypointLatLngs.length < 2) {
+      return;
+    }
 
     const waypointSignature = waypointLatLngs
       .map((waypoint: any) => `${waypoint.lat.toFixed(6)},${waypoint.lng.toFixed(6)}`)
@@ -600,10 +688,27 @@ export function MapView({ busLocations, locationShares, currentLocation, userRol
     clearActiveRoute(false);
   };
 
+  // Highlight a route requested from chatbot/map query link.
+  useEffect(() => {
+    if (!mapLoaded || !highlightBusRouteName) return;
+
+    const normalizedRouteName = normalizeBusRouteName(highlightBusRouteName);
+    if (!normalizedRouteName || normalizedRouteName === lastHighlightedRouteRef.current) {
+      return;
+    }
+
+    lastHighlightedRouteRef.current = normalizedRouteName;
+    highlightRouteFromBusName(highlightBusRouteName);
+  }, [highlightBusRouteName, mapLoaded]);
+
   // Keep selected bus location in sync with live updates
   useEffect(() => {
     if (!selectedBus) return;
-    const latestBus = onlineBuses.find(bus => bus.id === selectedBus.id);
+    const latestBus = onlineBuses.find(
+      (bus) =>
+        bus.id === selectedBus.id ||
+        normalizeBusRouteName(bus.route) === normalizeBusRouteName(selectedBus.route)
+    );
     if (!latestBus) return;
 
     if (

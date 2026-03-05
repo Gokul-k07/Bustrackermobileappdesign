@@ -1,24 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, X, Minimize2, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Bot, Loader2, Send, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { apiClient } from '../utils/api';
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  mapLink?: string;
 }
 
-export function AIChat() {
+interface AIChatProps {
+  onMapLinkClick?: (mapLink: string) => void;
+}
+
+export function AIChat({ onMapLinkClick }: AIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '👋 Hi! I\'m your BusTracker AI Assistant. Ask me about bus routes, online buses, or anything else!',
+      text: "Hi! I am your BusTracker assistant. Ask me about any PSNA route.",
       sender: 'bot',
       timestamp: new Date()
     }
@@ -31,14 +36,15 @@ export function AIChat() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
+    const messageText = inputMessage.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputMessage,
+      text: messageText,
       sender: 'user',
       timestamp: new Date()
     };
@@ -48,36 +54,26 @@ export function AIChat() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/server/make-server-8b08beda/chatbot`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`
-          },
-          body: JSON.stringify({ message: inputMessage })
-        }
-      );
+      const data = await apiClient.chatbot(messageText);
+      const reply = data.reply || data.response;
 
-      const data = await response.json();
-
-      if (data.success) {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: data.response,
-          sender: 'bot',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, botMessage]);
-      } else {
-        throw new Error(data.error);
+      if (!data.success || !reply) {
+        throw new Error('Invalid chatbot response');
       }
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: reply,
+        sender: 'bot',
+        timestamp: new Date(),
+        mapLink: data.mapLink
+      };
+      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: '❌ Sorry, I encountered an error. Please try again.',
+        text: 'Sorry, I could not process that. Please try again.',
         sender: 'bot',
         timestamp: new Date()
       };
@@ -85,6 +81,18 @@ export function AIChat() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMapLink = (mapLink: string) => {
+    if (!mapLink) return;
+
+    if (onMapLinkClick) {
+      onMapLinkClick(mapLink);
+      return;
+    }
+
+    window.history.pushState({}, '', mapLink);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   if (!isOpen) {
@@ -119,8 +127,8 @@ export function AIChat() {
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-96 p-4" ref={scrollRef}>
-            <div className="space-y-4">
+          <ScrollArea className="h-96 p-4">
+            <div ref={scrollRef} className="space-y-4">
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -136,6 +144,15 @@ export function AIChat() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-line">{message.text}</p>
+                    {message.sender === 'bot' && message.mapLink && (
+                      <Button
+                        variant="link"
+                        className="h-auto px-0 py-0 mt-1 text-xs"
+                        onClick={() => handleMapLink(message.mapLink as string)}
+                      >
+                        View Route on Map
+                      </Button>
+                    )}
                     <p className="text-xs opacity-70 mt-1">
                       {message.timestamp.toLocaleTimeString('en-US', {
                         hour: 'numeric',
@@ -158,7 +175,7 @@ export function AIChat() {
           <div className="p-4 border-t">
             <div className="flex gap-2">
               <Input
-                placeholder="Ask me anything..."
+                placeholder="Ask me about a bus route..."
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}

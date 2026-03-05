@@ -101,6 +101,7 @@ export default function App() {
 
   // Navigation state
   const [activeTab, setActiveTab] = useState('home');
+  const [highlightBusRouteName, setHighlightBusRouteName] = useState<string | null>(null);
   
   // Bus selection and available buses
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
@@ -111,6 +112,19 @@ export default function App() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const getMapStateFromUrl = () => {
+    if (typeof window === 'undefined') {
+      return { mapPath: false, busName: null as string | null };
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const busParam = params.get('bus');
+    const busName = busParam ? busParam.trim() : null;
+    const mapPath = window.location.pathname === '/map' || window.location.pathname.startsWith('/map/');
+
+    return { mapPath, busName };
+  };
 
 
   const resolveRoleFromSession = (authSession: any): UserRole => {
@@ -258,8 +272,16 @@ export default function App() {
   // Restore app state from localStorage
   const restoreAppState = () => {
     try {
+      const { mapPath, busName } = getMapStateFromUrl();
+      if (mapPath) {
+        setActiveTab('map');
+      }
+      if (busName) {
+        setHighlightBusRouteName(busName);
+      }
+
       const savedState = localStorage.getItem('bustracker_app_state');
-      if (savedState) {
+      if (savedState && !mapPath) {
         const state = JSON.parse(savedState);
         if (state.activeTab) setActiveTab(state.activeTab);
       }
@@ -287,6 +309,20 @@ export default function App() {
       saveAppState();
     }
   }, [activeTab, user?.id]);
+
+  // Keep map-link URL state in sync on browser navigation.
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const { mapPath, busName } = getMapStateFromUrl();
+      if (mapPath) {
+        setActiveTab('map');
+      }
+      setHighlightBusRouteName(busName);
+    };
+
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
 
   const loadAvailableBuses = async () => {
     try {
@@ -781,6 +817,20 @@ export default function App() {
     });
   };
 
+  const handleChatMapLinkClick = (mapLink: string) => {
+    try {
+      const targetUrl = new URL(mapLink, window.location.origin);
+      const busName = targetUrl.searchParams.get('bus')?.trim() || null;
+
+      setActiveTab('map');
+      setHighlightBusRouteName(busName);
+      window.history.pushState({}, '', `${targetUrl.pathname}${targetUrl.search}`);
+    } catch (error) {
+      console.error('Invalid chatbot map link:', mapLink, error);
+      toast.error('Invalid map link');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -872,6 +922,7 @@ export default function App() {
                 userId={user.id}
                 isLocationSharing={isLocationSharing}
                 locationPermissionGranted={locationPermissionGranted}
+                highlightBusRouteName={highlightBusRouteName}
               />
             </div>
           )}
@@ -988,7 +1039,7 @@ export default function App() {
         </div>
 
         {/* AI Chat Component */}
-        <AIChat />
+        <AIChat onMapLinkClick={handleChatMapLinkClick} />
 
         {/* Bottom Navigation - Always visible */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-30 shadow-lg">

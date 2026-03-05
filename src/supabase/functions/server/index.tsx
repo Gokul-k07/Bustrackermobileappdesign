@@ -923,6 +923,45 @@ app.get('/bus/:busId/stops', async (c) => {
   }
 })
 
+// Get route stops for a bus name (works even if bus is offline)
+app.get('/route/stops', async (c) => {
+  try {
+    const busNameParam = c.req.query('busName')
+    const busName = busNameParam?.trim()
+
+    if (!busName) {
+      return c.json({ error: 'busName query parameter is required' }, 400)
+    }
+
+    const allBuses = await kv.getByPrefix('bus:')
+    const activeBus = allBuses.find(bus => bus.route === busName && bus.isOnline)
+
+    let busStops = activeBus?.busStops || []
+    if (busStops.length === 0) {
+      busStops = await getDefaultRoutesForBus(busName)
+    }
+
+    if (!busStops || busStops.length === 0) {
+      return c.json({ error: `No route data found for ${busName}` }, 404)
+    }
+
+    return c.json({
+      success: true,
+      route: {
+        busName,
+        isOnline: !!activeBus,
+        busId: activeBus?.id || null,
+        lat: activeBus?.lat || null,
+        lng: activeBus?.lng || null,
+        busStops
+      }
+    })
+  } catch (error) {
+    console.log('Route stops fetch error:', error)
+    return c.json({ error: 'Failed to fetch route stops' }, 500)
+  }
+})
+
 // Update bus stop status (driver marks stop as passed)
 app.post('/driver/update-stop', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
@@ -1115,7 +1154,8 @@ app.post('/chatbot', async (c) => {
     const onlineBuses = allBuses.filter(bus => bus.isOnline)
     const offlineBuses = availableBuses.length - onlineBuses.length
 
-    let response = ''
+    let reply = ''
+    let mapLink: string | undefined = undefined
 
   // Check for specific bus route query
   const busMatch = lowerMessage.match(/psna[-\s]?(\d+|[\d\/]+)/i) || lowerMessage.match(/bus[-\s]?(\d+|[\d\/]+)/i)
@@ -1129,63 +1169,69 @@ app.post('/chatbot', async (c) => {
       if (foundBus) busName = foundBus
     }
     
-    const busRoute = DEFAULT_BUS_ROUTES[busName]
-    if (busRoute) {
-      response = `📍 **Routes for ${busName}**\n\n${busRoute.map((stop, i) => `${i + 1}. ${stop}`).join('\n')}\n\n✅ Total stops: ${busRoute.length}`
+    const busRouteStops = await getDefaultRoutesForBus(busName)
+    const busRoute = busRouteStops.map((stop: any) => stop.name)
+
+    if (busRoute.length > 0) {
+      mapLink = `/map?bus=${encodeURIComponent(busName)}`
+      reply = `🚌 ${busName} Route\n${busRoute.length} Stops\n\n${busRoute.map((stop, i) => `${i + 1}. ${stop}`).join('\n')}\n\nTap "View Route on Map" to highlight this route.`
     } else {
-      response = `❌ Sorry, I don't have route information for ${busName}. This bus may not be in our system.\n\nAvailable routes: ${availableBuses.slice(0, 5).join(', ')}...`
+      reply = `❌ Sorry, I don't have route information for ${busName}. This bus may not be in our system.\n\nAvailable routes: ${availableBuses.slice(0, 5).join(', ')}...`
     }
   }
   // Detailed explanation of specific features
   else if (lowerMessage.includes('how to use') || lowerMessage.includes('instructions')) {
-    response = `📖 **How to Use BusTracker**\n\n1. **Drivers**: Click "Start Trip" to share your location and earn 10 coins. Generate OTPs for passengers.\n2. **Passengers**: View live buses on the map. Click a bus to see its stops. Use an OTP to share your own location and earn coins.\n3. **Map**: Click icons to see distance/time info. Swipe down to refresh.`
+    reply = `📖 **How to Use BusTracker**\n\n1. **Drivers**: Click "Start Trip" to share your location and earn 10 coins. Generate OTPs for passengers.\n2. **Passengers**: View live buses on the map. Click a bus to see its stops. Use an OTP to share your own location and earn coins.\n3. **Map**: Click icons to see distance/time info. Swipe down to refresh.`
   }
   // Real-time details
   else if (lowerMessage.includes('time') || lowerMessage.includes('far') || lowerMessage.includes('distance')) {
-    response = `⏱️ **Time & Distance**\n\nWhen you select a bus on the map, I calculate the distance and estimated time of arrival based on real-time traffic and road routing. Check the bottom bar when a bus is selected!`
+    reply = `⏱️ **Time & Distance**\n\nWhen you select a bus on the map, I calculate the distance and estimated time of arrival based on real-time traffic and road routing. Check the bottom bar when a bus is selected!`
   }
   // Greetings
   else if (lowerMessage.match(/\b(hi|hello|hey|greetings|yo)\b/)) {
-    response = `👋 **Hi there! I'm your BusTracker AI Assistant.**\n\nI can tell you about bus routes, live status, or how the coin system works. What's on your mind?`
+    reply = `👋 **Hi there! I'm your BusTracker AI Assistant.**\n\nI can tell you about bus routes, live status, or how the coin system works. What's on your mind?`
   }
   // How many buses online/offline
   else if (lowerMessage.includes('online') || lowerMessage.includes('live') || lowerMessage.includes('tracking')) {
-    response = `🚌 **Bus Status**\n\n✅ Online: ${onlineBuses.length} buses\n⏸️ Offline: ${offlineBuses} buses\n📊 Total registered: ${availableBuses.length}\n\n${onlineBuses.length > 0 ? `Currently online:\n${onlineBuses.map(bus => `• **${bus.route}** (Driver: ${bus.driverName})`).join('\n')}` : 'No buses are currently online.'}`
+    reply = `🚌 **Bus Status**\n\n✅ Online: ${onlineBuses.length} buses\n⏸️ Offline: ${offlineBuses} buses\n📊 Total registered: ${availableBuses.length}\n\n${onlineBuses.length > 0 ? `Currently online:\n${onlineBuses.map(bus => `• **${bus.route}** (Driver: ${bus.driverName})`).join('\n')}` : 'No buses are currently online.'}`
   }
   // How many buses in app
   else if (lowerMessage.includes('how many') && (lowerMessage.includes('bus') || lowerMessage.includes('total'))) {
-    response = `📊 **Total Buses in App**: ${availableBuses.length}\n\n✅ Online: ${onlineBuses.length}\n⏸️ Offline: ${offlineBuses}\n\nCommon buses:\n${availableBuses.slice(0, 8).join(', ')}...`
+    reply = `📊 **Total Buses in App**: ${availableBuses.length}\n\n✅ Online: ${onlineBuses.length}\n⏸️ Offline: ${offlineBuses}\n\nCommon buses:\n${availableBuses.slice(0, 8).join(', ')}...`
   }
   // Coin related
   else if (lowerMessage.includes('coin') || lowerMessage.includes('earn') || lowerMessage.includes('pay') || lowerMessage.includes('money')) {
-    response = `💰 **Coins & Rewards**\n\n• **Earn**: You get **10 coins** every time you share your location (as a driver or via OTP).\n• **Share**: It costs **10 coins** to request location sharing via OTP.\n• **Purpose**: This ensures high-quality, verified location data for all users!`
+    reply = `💰 **Coins & Rewards**\n\n• **Earn**: You get **10 coins** every time you share your location (as a driver or via OTP).\n• **Share**: It costs **10 coins** to request location sharing via OTP.\n• **Purpose**: This ensures high-quality, verified location data for all users!`
   }
   // Roles related
   else if (lowerMessage.includes('driver') || lowerMessage.includes('passenger') || lowerMessage.includes('role') || lowerMessage.includes('account')) {
-    response = `👥 **Account Roles**\n\n• **Drivers**: Manage the bus, update stops, and generate codes.\n• **Passengers**: Monitor buses, check ETA, and provide location feedback.\n\nYou select your role during signup!`
+    reply = `👥 **Account Roles**\n\n• **Drivers**: Manage the bus, update stops, and generate codes.\n• **Passengers**: Monitor buses, check ETA, and provide location feedback.\n\nYou select your role during signup!`
   }
   // List all buses
   else if (lowerMessage.includes('list') || lowerMessage.includes('all buses') || lowerMessage.includes('show buses')) {
-    response = `🚌 **Available Buses**:\n\n${availableBuses.join(', ')}\n\n📊 Total: ${availableBuses.length} buses`
+    reply = `🚌 **Available Buses**:\n\n${availableBuses.join(', ')}\n\n📊 Total: ${availableBuses.length} buses`
   }
   else if (lowerMessage.includes('owner') || lowerMessage.includes('creator') || lowerMessage.includes('who made') || lowerMessage.includes('developer')) {
-    response = `👨‍💻 **Developer Profile**\n\n**GOKUL K**\nRole: Application Developer\n📧 Email: gokulk24cb@psnacet.edu.in\n\nThis app was built to help PSNACET students track college buses efficiently.`
+    reply = `👨‍💻 **Developer Profile**\n\n**GOKUL K**\nRole: Application Developer\n📧 Email: gokulk24cb@psnacet.edu.in\n\nThis app was built to help PSNACET students track college buses efficiently.`
   }
   else if (lowerMessage.includes('contact') || lowerMessage.includes('support') || lowerMessage.includes('help') || lowerMessage.includes('problem')) {
-    response = `ℹ️ **Support**\n\n• **Tech Issues**: Email **gokulk24cb@psnacet.edu.in**\n• **Official Info**: Visit the **PSNACET website**.\n• **Routes**: Ask me "Where is PSNA-30?"`
+    reply = `ℹ️ **Support**\n\n• **Tech Issues**: Email **gokulk24cb@psnacet.edu.in**\n• **Official Info**: Visit the **PSNACET website**.\n• **Routes**: Ask me "Where is PSNA-30?"`
   }
   // Feedback
   else if (lowerMessage.includes('feedback') || lowerMessage.includes('suggest') || lowerMessage.includes('report')) {
-    response = `📝 **Feedback**\n\nYou can submit feedback through the **Profile** tab. Click "Feedback & Support" to open your mail app with pre-filled technical details.`
+    reply = `📝 **Feedback**\n\nYou can submit feedback through the **Profile** tab. Click "Feedback & Support" to open your mail app with pre-filled technical details.`
   }
   // Default response
   else {
-    response = `👋 **Hi! I'm your BusTracker AI Assistant**\n\nI didn't quite understand that. Try asking:\n\n📍 "What is the route for PSNA-30?"\n📡 "Which buses are currently online?"\n💰 "How do I earn 10 coins?"\n👥 "Who developed this app?"`
+    reply = `👋 **Hi! I'm your BusTracker AI Assistant**\n\nI didn't quite understand that. Try asking:\n\n📍 "What is the route for PSNA-30?"\n📡 "Which buses are currently online?"\n💰 "How do I earn 10 coins?"\n👥 "Who developed this app?"`
   }
 
     return c.json({ 
       success: true, 
-      response,
+      reply,
+      mapLink,
+      // Backward-compatible alias
+      response: reply,
       timestamp: new Date().toISOString()
     })
   } catch (error) {
