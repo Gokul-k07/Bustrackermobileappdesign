@@ -1153,18 +1153,20 @@ export function MapView({
                       <Edit2 className="h-4 w-4 mr-2" />
                       Edit Route Stops
                     </Button>
-                    <div className="flex gap-2">
-                      {busStops.map((stop) => (
-                        <Button
-                          key={stop.id}
-                          size="sm"
-                          variant={stop.passed ? "outline" : "default"}
-                          onClick={() => handleStopToggle(stop.id, stop.passed)}
-                          className="text-xs"
-                        >
-                          {stop.name.substring(0, 10)}...
-                        </Button>
-                      ))}
+                    <div className="overflow-x-auto pb-1">
+                      <div className="flex gap-2 min-w-max">
+                        {busStops.map((stop) => (
+                          <Button
+                            key={stop.id}
+                            size="sm"
+                            variant={stop.passed ? "outline" : "default"}
+                            onClick={() => handleStopToggle(stop.id, stop.passed)}
+                            className="text-xs whitespace-nowrap"
+                          >
+                            {stop.name.substring(0, 10)}...
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

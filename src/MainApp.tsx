@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send, Loader2, Bell, Shield } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
@@ -71,6 +71,32 @@ export interface OTP {
   used: boolean;
 }
 
+const ADMIN_ACCESS_EMAIL = 'gokulk24cb@psnacet.edu.in';
+const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
+
+const FUTURE_NOTIFICATIONS = [
+  {
+    title: 'Bus Stop Proximity Alert',
+    detail: 'Notify driver and passengers when bus is within 50 meters of the next stop.'
+  },
+  {
+    title: 'Passenger Overload Alert',
+    detail: 'Warn when onboard passenger count exceeds safe threshold.'
+  },
+  {
+    title: 'Delay Prediction',
+    detail: 'Show route delay risk based on traffic and previous trip timings.'
+  },
+  {
+    title: 'Driver Safety Monitoring',
+    detail: 'Flag harsh braking, overspeeding, or fatigue-risk driving patterns.'
+  },
+  {
+    title: 'Emergency Broadcast',
+    detail: 'Send immediate alerts to admin, driver, and nearby passengers.'
+  }
+];
+
 // Initialize Supabase client
 const supabase = createClient(
   `https://${projectId}.supabase.co`,
@@ -112,6 +138,7 @@ export default function MainApp() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
 
   const getMapStateFromUrl = () => {
     if (typeof window === 'undefined') {
@@ -131,6 +158,14 @@ export default function MainApp() {
     const sessionRole = authSession?.user?.user_metadata?.role;
     if (sessionRole === 'driver' || sessionRole === 'passenger' || sessionRole === 'admin') {
       return sessionRole;
+    }
+    return null;
+  };
+
+  const resolveFallbackRoleFromEmail = (email?: string | null): UserRole => {
+    const normalizedEmail = normalizeEmail(email);
+    if (normalizedEmail === ADMIN_ACCESS_EMAIL) {
+      return 'driver';
     }
     return null;
   };
@@ -173,7 +208,8 @@ export default function MainApp() {
       if (initRunId !== initRunIdRef.current) return;
 
       const profileUser = profileData?.user || {};
-      const effectiveRole = sessionRole || profileUser.role || null;
+      const fallbackRole = resolveFallbackRoleFromEmail(profileUser.email || authSession.user.email);
+      const effectiveRole = sessionRole || profileUser.role || fallbackRole;
       const mergedUser: User = {
         id: profileUser.id || authSession.user.id,
         name: profileUser.name || authSession.user.email?.split('@')[0] || 'User',
@@ -860,6 +896,8 @@ export default function MainApp() {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
+  const hasAdminPanelAccess = user.role === 'admin' || normalizeEmail(user.email) === ADMIN_ACCESS_EMAIL;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto bg-white min-h-screen relative">
@@ -874,9 +912,40 @@ export default function MainApp() {
               <Coins className="h-3 w-3" />
               {user.coins || 0}
             </Badge>
+            {hasAdminPanelAccess && user.role !== 'admin' && (
+              <Badge variant="outline" className="hidden sm:flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Admin Access
+              </Badge>
+            )}
             <Badge variant={user.role === 'admin' ? 'destructive' : (isOnline && user.role === 'driver' ? 'default' : 'secondary')}>
               {user.role === 'admin' ? 'Admin' : (user.role === 'driver' ? (isOnline ? 'Online' : 'Offline') : 'Passenger')}
             </Badge>
+            <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                  <Bell className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Notification Menu</DialogTitle>
+                  <DialogDescription>
+                    Planned system alerts and upgrades.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {FUTURE_NOTIFICATIONS.map((item) => (
+                    <Card key={item.title}>
+                      <CardContent className="p-3">
+                        <p className="font-medium text-sm">{item.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -909,6 +978,12 @@ export default function MainApp() {
                   availableBuses={availableBuses}
                 />
               )}
+            </div>
+          )}
+
+          {activeTab === 'admin' && hasAdminPanelAccess && (
+            <div className="p-4">
+              <AdminDashboard currentUser={user} />
             </div>
           )}
           
@@ -1043,7 +1118,7 @@ export default function MainApp() {
 
         {/* Bottom Navigation - Always visible */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-30 shadow-lg">
-          <div className="grid grid-cols-3 p-4">
+          <div className={`grid ${hasAdminPanelAccess ? 'grid-cols-4' : 'grid-cols-3'} p-4`}>
             <Button 
               variant={activeTab === 'home' ? 'default' : 'ghost'} 
               className="flex flex-col items-center gap-1 h-auto py-2"
@@ -1060,6 +1135,16 @@ export default function MainApp() {
               <Bus className="h-4 w-4" />
               <span className="text-xs">Map</span>
             </Button>
+            {hasAdminPanelAccess && (
+              <Button 
+                variant={activeTab === 'admin' ? 'default' : 'ghost'} 
+                className="flex flex-col items-center gap-1 h-auto py-2"
+                onClick={() => setActiveTab('admin')}
+              >
+                <Shield className="h-4 w-4" />
+                <span className="text-xs">Admin</span>
+              </Button>
+            )}
             <Button 
               variant={activeTab === 'profile' ? 'default' : 'ghost'} 
               className="flex flex-col items-center gap-1 h-auto py-2"
