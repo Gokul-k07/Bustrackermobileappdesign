@@ -1,96 +1,52 @@
-"use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/dist/ScrollTrigger";
 import {
   ArrowRight,
   Bot,
-  Bus,
   Clock3,
   EyeOff,
   MapPin,
   Navigation,
   Route,
   Share2,
-  Sparkles,
 } from "lucide-react";
 
-const FRAME_COUNT = 240;
-const HERO_SCROLL_DISTANCE = 3200;
+const TOTAL_FRAMES = 240;
+const LAST_FRAME_INDEX = TOTAL_FRAMES - 1;
 
-const problemCards = [
-  {
-    title: "Uncertain Wait Times",
-    description: "Passengers wait without knowing bus locations",
-    icon: Clock3,
-  },
-  {
-    title: "No Real-Time Visibility",
-    description: "Public transport lacks real-time visibility",
-    icon: EyeOff,
-  },
-  {
-    title: "Daily Time Loss",
-    description: "Time is wasted at bus stops",
-    icon: MapPin,
-  },
+const problemItems = [
+  "Passengers wait without knowing bus location",
+  "Public transport lacks real-time visibility",
+  "Time wasted at bus stops",
 ];
 
-const solutionCards = [
+const featureItems = [
   {
     title: "Live Bus Tracking",
-    description: "Track buses with instant location updates and arrival confidence.",
+    description: "Track bus movement in real time with smooth location updates.",
     icon: Navigation,
   },
   {
-    title: "OTP Passenger Sharing",
-    description: "Secure temporary sharing between passengers and drivers.",
+    title: "Driver Location Sharing",
+    description: "Drivers share live position for accurate passenger visibility.",
     icon: Share2,
   },
   {
     title: "Route Visualization",
-    description: "Interactive path overlays with stop-by-stop context.",
+    description: "Understand route progress with stop-by-stop mapping overlays.",
     icon: Route,
   },
   {
     title: "AI Bus Route Chatbot",
-    description: "Ask route, stop, and timing questions in natural language.",
+    description: "Ask for routes, ETAs, and alternatives with natural language.",
     icon: Bot,
   },
 ];
 
-const featureCards = [
-  {
-    title: "Real-time bus tracking",
-    description:
-      "Continuously updated bus position with smooth map movement and ETA confidence.",
-    icon: Bus,
-  },
-  {
-    title: "Driver location sharing",
-    description:
-      "Drivers share authenticated live locations for trusted trip visibility.",
-    icon: Share2,
-  },
-  {
-    title: "Interactive route map",
-    description:
-      "See active routes, stop states, and travel progress in one map layer.",
-    icon: Route,
-  },
-  {
-    title: "Smart bus search chatbot",
-    description:
-      "Find routes, nearby buses, and alternatives through conversational search.",
-    icon: Sparkles,
-  },
-];
-
-const frameId = (index: number) => String(index + 1).padStart(3, "0");
-
 const frameSources = (index: number) => {
-  const id = frameId(index);
+  const id = String(index + 1).padStart(3, "0");
   return [
     `/hero-frames/frame${id}.png`,
     `/hero-frames/frame${id}.jpg`,
@@ -101,32 +57,29 @@ const frameSources = (index: number) => {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const activeTextGroup = (frame: number) => {
+  if (frame < 60) return 0;
+  if (frame < 120) return 1;
+  if (frame < 180) return 2;
+  return 3;
+};
+
 export default function NextStopLanding() {
+  const navigate = useNavigate();
+
   const pageRef = useRef<HTMLElement | null>(null);
   const heroSectionRef = useRef<HTMLElement | null>(null);
   const heroPinRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
+  const textGroupRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
-  const currentFrameRef = useRef(0);
+  const renderedFrameRef = useRef(0);
   const progressRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  const activeGroupRef = useRef(-1);
 
-  const [isReady, setIsReady] = useState(false);
-
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 28 }, (_, i) => ({
-        id: i,
-        left: Math.random() * 100,
-        top: Math.random() * 100,
-        size: 2 + Math.random() * 4,
-        delay: Math.random() * 8,
-        duration: 7 + Math.random() * 10,
-        opacity: 0.2 + Math.random() * 0.6,
-      })),
-    [],
-  );
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [framesReady, setFramesReady] = useState(false);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -136,341 +89,741 @@ export default function NextStopLanding() {
     const pinEl = heroPinRef.current;
     const canvas = canvasRef.current;
     if (!pageEl || !heroEl || !pinEl || !canvas) return;
-    let teardown: (() => void) | undefined;
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+
+    let cancelled = false;
+
+    const drawFrame = (index: number) => {
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+
+      ctx.fillStyle = "#030712";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const image = imagesRef.current[index];
+      if (!image) return;
+
+      const imageWidth = image.naturalWidth || image.width;
+      const imageHeight = image.naturalHeight || image.height;
+      if (!imageWidth || !imageHeight) return;
+
+      const scale = Math.max(canvasWidth / imageWidth, canvasHeight / imageHeight);
+      const drawWidth = imageWidth * scale;
+      const drawHeight = imageHeight * scale;
+      const drawX = (canvasWidth - drawWidth) * 0.5;
+      const drawY = (canvasHeight - drawHeight) * 0.5;
+      ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    };
+
+    const resizeCanvas = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(canvas.clientWidth * dpr);
+      canvas.height = Math.floor(canvas.clientHeight * dpr);
+      drawFrame(renderedFrameRef.current);
+    };
+
+    const renderFromProgress = () => {
+      const mappedFrame = Math.floor(progressRef.current * LAST_FRAME_INDEX);
+      const nextFrame = clamp(mappedFrame, 0, LAST_FRAME_INDEX);
+      if (nextFrame === renderedFrameRef.current) return;
+
+      renderedFrameRef.current = nextFrame;
+      drawFrame(nextFrame);
+      setCurrentFrame((prev) => (prev === nextFrame ? prev : nextFrame));
+    };
+
+    const queueRender = () => {
+      if (rafRef.current !== null) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        renderFromProgress();
+      });
+    };
+
+    const loadSingleFrame = (sources: string[]) =>
+      new Promise<HTMLImageElement | null>((resolve) => {
+        const trySource = (sourceIndex: number) => {
+          if (sourceIndex >= sources.length) {
+            resolve(null);
+            return;
+          }
+
+          const image = new Image();
+          image.decoding = "async";
+          image.src = sources[sourceIndex];
+          image.onload = () => resolve(image);
+          image.onerror = () => trySource(sourceIndex + 1);
+        };
+
+        trySource(0);
+      });
+
+    const preloadFrames = async () => {
+      const loaded = await Promise.all(
+        Array.from({ length: TOTAL_FRAMES }, (_, index) =>
+          loadSingleFrame(frameSources(index)),
+        ),
+      );
+      imagesRef.current = loaded;
+    };
 
     const context = gsap.context(() => {
-      const ctx = canvas.getContext("2d", { alpha: false });
-      if (!ctx) return;
+      textGroupRefs.current.forEach((node, index) => {
+        if (!node) return;
+        gsap.set(node, { autoAlpha: index === 0 ? 1 : 0, y: index === 0 ? 0 : 40 });
+      });
+      activeGroupRef.current = 0;
 
-      let cancelled = false;
-      let loaded = 0;
+      window.addEventListener("resize", resizeCanvas);
 
-      const resizeCanvas = () => {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(canvas.clientWidth * dpr);
-        canvas.height = Math.floor(canvas.clientHeight * dpr);
-        drawFrame(currentFrameRef.current);
-      };
+      preloadFrames().then(() => {
+        if (cancelled) return;
 
-      const drawFrame = (index: number) => {
-        const image = imagesRef.current[index];
-        if (!image) return;
+        setFramesReady(true);
+        renderedFrameRef.current = 0;
+        resizeCanvas();
+        drawFrame(0);
 
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const imageWidth = image.naturalWidth || image.width;
-        const imageHeight = image.naturalHeight || image.height;
-        if (!imageWidth || !imageHeight) return;
-
-        const scale = Math.max(canvasWidth / imageWidth, canvasHeight / imageHeight);
-        const drawWidth = imageWidth * scale;
-        const drawHeight = imageHeight * scale;
-        const dx = (canvasWidth - drawWidth) / 2;
-        const dy = (canvasHeight - drawHeight) / 2;
-
-        ctx.fillStyle = "#020617";
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        ctx.drawImage(image, dx, dy, drawWidth, drawHeight);
-      };
-
-      const queueDraw = () => {
-        if (rafRef.current !== null) return;
-        rafRef.current = window.requestAnimationFrame(() => {
-          rafRef.current = null;
-          const mappedFrame = Math.round(progressRef.current * (FRAME_COUNT - 1));
-          currentFrameRef.current = clamp(mappedFrame, 0, FRAME_COUNT - 1);
-          drawFrame(currentFrameRef.current);
-        });
-      };
-
-      const loadImage = (sources: string[]) =>
-        new Promise<HTMLImageElement | null>((resolve) => {
-          const trySource = (sourceIndex: number) => {
-            if (sourceIndex >= sources.length) {
-              resolve(null);
-              return;
-            }
-
-            const image = new Image();
-            image.decoding = "async";
-            image.loading = "eager";
-            image.src = sources[sourceIndex];
-            image.onload = () => resolve(image);
-            image.onerror = () => trySource(sourceIndex + 1);
-          };
-
-          trySource(0);
-        });
-
-      const preloadFrames = async () => {
-        const tasks = Array.from({ length: FRAME_COUNT }, async (_, index) => {
-          const image = await loadImage(frameSources(index));
-          imagesRef.current[index] = image;
-          loaded += 1;
-
-          if (!cancelled && loaded === 1 && image) {
-            currentFrameRef.current = 0;
-            resizeCanvas();
-            drawFrame(0);
-          }
-        });
-
-        await Promise.all(tasks);
-      };
-
-      const initScroll = () => {
         ScrollTrigger.create({
           trigger: heroEl,
           start: "top top",
-          end: `+=${HERO_SCROLL_DISTANCE}`,
+          end: "bottom top",
           scrub: true,
           pin: pinEl,
-          pinSpacing: true,
+          pinSpacing: false,
           anticipatePin: 1,
           onUpdate: (self) => {
             progressRef.current = self.progress;
-            queueDraw();
+            queueRender();
           },
         });
 
-        gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((node) => {
+        gsap.utils.toArray<HTMLElement>("[data-fade-up]").forEach((node) => {
           gsap.fromTo(
             node,
-            { autoAlpha: 0, y: 36 },
+            { autoAlpha: 0, y: 40 },
             {
               autoAlpha: 1,
               y: 0,
-              duration: 0.9,
-              ease: "power3.out",
+              duration: 0.8,
+              ease: "power2.out",
               scrollTrigger: {
                 trigger: node,
-                start: "top 85%",
-                once: true,
+                start: "top 84%",
+                toggleActions: "play none none reverse",
               },
             },
           );
         });
 
         ScrollTrigger.refresh();
-      };
-
-      window.addEventListener("resize", resizeCanvas);
-
-      preloadFrames().then(() => {
-        if (cancelled) return;
-        setIsReady(true);
-        resizeCanvas();
-        initScroll();
       });
-
-      teardown = () => {
-        cancelled = true;
-        window.removeEventListener("resize", resizeCanvas);
-        if (rafRef.current !== null) {
-          window.cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-      };
     }, pageEl);
 
     return () => {
-      teardown?.();
+      cancelled = true;
+      window.removeEventListener("resize", resizeCanvas);
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       context.revert();
     };
   }, []);
 
+  useEffect(() => {
+    const nextGroup = activeTextGroup(currentFrame);
+    if (nextGroup === activeGroupRef.current) return;
+
+    const previousNode =
+      activeGroupRef.current >= 0 ? textGroupRefs.current[activeGroupRef.current] : null;
+    const nextNode = textGroupRefs.current[nextGroup];
+
+    if (previousNode) {
+      gsap.to(previousNode, {
+        autoAlpha: 0,
+        y: 40,
+        duration: 0.42,
+        ease: "power2.out",
+        overwrite: true,
+      });
+    }
+
+    if (nextNode) {
+      gsap.to(nextNode, {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.55,
+        ease: "power2.out",
+        overwrite: true,
+      });
+    }
+
+    activeGroupRef.current = nextGroup;
+  }, [currentFrame]);
+
   return (
-    <main
-      ref={pageRef}
-      className="relative min-h-screen overflow-x-clip bg-[#020617] text-slate-100"
-      style={{ fontFamily: "'Space Grotesk', 'Rajdhani', 'Segoe UI', sans-serif" }}
-    >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-48 top-10 h-80 w-80 rounded-full bg-cyan-500/25 blur-3xl" />
-        <div className="absolute right-[-120px] top-[24%] h-72 w-72 rounded-full bg-orange-500/20 blur-3xl" />
-        <div className="absolute bottom-[-110px] left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-blue-700/25 blur-3xl" />
-        {particles.map((particle) => (
-          <span
-            key={particle.id}
-            className="particle absolute rounded-full bg-cyan-300"
-            style={{
-              left: `${particle.left}%`,
-              top: `${particle.top}%`,
-              width: `${particle.size}px`,
-              height: `${particle.size}px`,
-              opacity: particle.opacity,
-              animationDelay: `${particle.delay}s`,
-              animationDuration: `${particle.duration}s`,
-            }}
-          />
-        ))}
+    <main ref={pageRef} className="nextstop-landing">
+      <div className="nextstop-ambient">
+        <div className="nextstop-glow nextstop-glow-cyan" />
+        <div className="nextstop-glow nextstop-glow-orange" />
       </div>
 
-      <section ref={heroSectionRef} className="relative h-screen">
-        <div ref={heroPinRef} className="relative flex h-screen items-center justify-center">
-          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/30 via-black/35 to-[#020617]/95" />
+      <section ref={heroSectionRef} className="hero-shell">
+        <div ref={heroPinRef} className="hero-pin">
+          <canvas ref={canvasRef} className="hero-canvas" />
+          <div className="hero-overlay" />
 
-          <div className="relative z-10 px-6 text-center">
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold tracking-[0.24em] text-cyan-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              FUTURE OF PUBLIC MOBILITY
-            </p>
+          {!framesReady && <p className="hero-loading">Loading hero frames...</p>}
 
-            <h1 className="bg-gradient-to-r from-cyan-200 via-cyan-300 to-orange-300 bg-clip-text text-5xl font-extrabold tracking-tight text-transparent sm:text-7xl md:text-8xl">
-              NextStop
-            </h1>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base text-slate-200 sm:text-xl">
-              Real-time bus tracking for smarter travel
-            </p>
-
-            <div className="mt-8 flex items-center justify-center">
-              <a
-                href="#final-cta"
-                className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-orange-300/50 bg-orange-400/20 px-6 py-3 text-sm font-semibold text-orange-100 transition duration-300 hover:bg-orange-400/35 hover:shadow-[0_0_32px_rgba(251,146,60,0.45)]"
-              >
-                Open Live App
-                <ArrowRight className="h-4 w-4" />
-              </a>
+          <div className="hero-text-stage">
+            <div
+              ref={(node) => {
+                textGroupRefs.current[0] = node;
+              }}
+              className="hero-group"
+            >
+              <h1 className="hero-title">NextStop</h1>
+              <p className="hero-subtitle">Real-time bus tracking for smarter travel</p>
             </div>
 
-            <p className="mt-8 text-xs tracking-[0.2em] text-cyan-100/70">
-              SCROLL TO DRIVE THE TIMELINE
-            </p>
+            <div
+              ref={(node) => {
+                textGroupRefs.current[1] = node;
+              }}
+              className="hero-group"
+            >
+              <h2 className="hero-heading">Never Miss Your Bus</h2>
+              <p className="hero-subtitle">Know exactly where your bus is.</p>
+            </div>
 
-            {!isReady && (
-              <p className="mt-4 text-xs text-slate-300/80">
-                Loading sequence frames...
+            <div
+              ref={(node) => {
+                textGroupRefs.current[2] = node;
+              }}
+              className="hero-group"
+            >
+              <h2 className="hero-heading">Smart Public Transport</h2>
+              <p className="hero-subtitle">
+                Live location sharing between drivers and passengers.
               </p>
-            )}
+            </div>
+
+            <div
+              ref={(node) => {
+                textGroupRefs.current[3] = node;
+              }}
+              className="hero-group"
+            >
+              <h2 className="hero-heading">Built for Smart Cities</h2>
+              <div className="hero-button-wrap">
+                <button
+                  type="button"
+                  onClick={() => navigate("/app")}
+                  className="btn btn-orange"
+                >
+                  Open NextStop
+                  <ArrowRight className="btn-icon" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-24">
-        <div data-reveal className="mb-10 max-w-3xl">
-          <p className="text-sm uppercase tracking-[0.2em] text-cyan-200/80">Problem</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-            Urban transit still runs on uncertainty.
-          </h2>
-        </div>
+      <section className="section section-problem section-full">
+        <div className="section-container">
+          <div data-fade-up className="section-header">
+            <p className="section-kicker">Problem</p>
+            <h2 className="section-title">Daily commuting still lacks clarity.</h2>
+          </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {problemCards.map((card) => (
-            <article
-              key={card.title}
-              data-reveal
-              className="group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition duration-300 hover:-translate-y-1.5 hover:border-cyan-300/35 hover:bg-cyan-300/10"
-            >
-              <div className="mb-4 inline-flex rounded-lg border border-cyan-300/35 bg-cyan-300/10 p-2.5 text-cyan-200">
-                <card.icon className="h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">{card.title}</h3>
-              <p className="mt-2 text-sm text-slate-300">{card.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-24">
-        <div data-reveal className="mb-10 max-w-3xl">
-          <p className="text-sm uppercase tracking-[0.2em] text-orange-200/90">Solution</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-            NextStop delivers a connected travel layer for every route.
-          </h2>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {solutionCards.map((card) => (
-            <article
-              key={card.title}
-              data-reveal
-              className="group relative overflow-hidden rounded-2xl border border-cyan-300/25 bg-slate-900/60 p-6 backdrop-blur-xl transition duration-300 hover:border-orange-300/45 hover:shadow-[0_0_40px_rgba(56,189,248,0.2)]"
-            >
-              <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-cyan-400/20 blur-2xl transition duration-300 group-hover:bg-orange-400/25" />
-              <div className="relative">
-                <div className="mb-4 inline-flex rounded-lg border border-orange-300/30 bg-orange-300/10 p-2.5 text-orange-200">
-                  <card.icon className="h-5 w-5" />
+          <div className="problem-grid">
+            {problemItems.map((item, index) => (
+              <article key={item} data-fade-up className="glass-card">
+                <div className="icon-pill">
+                  {index === 0 && <Clock3 className="icon" />}
+                  {index === 1 && <EyeOff className="icon" />}
+                  {index === 2 && <MapPin className="icon" />}
                 </div>
-                <h3 className="text-xl font-semibold text-white">{card.title}</h3>
-                <p className="mt-2 text-sm text-slate-300">{card.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-24">
-        <div data-reveal className="mb-10 max-w-3xl">
-          <p className="text-sm uppercase tracking-[0.2em] text-cyan-200/80">Features</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-            Tools built for passengers, drivers, and operations teams.
-          </h2>
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2">
-          {featureCards.map((feature) => (
-            <article
-              key={feature.title}
-              data-reveal
-              className="group rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 to-transparent p-6 backdrop-blur-xl transition duration-300 hover:-translate-y-1.5 hover:border-cyan-300/45 hover:shadow-[0_12px_36px_rgba(14,165,233,0.2)]"
-            >
-              <div className="mb-4 inline-flex rounded-lg border border-cyan-200/25 bg-cyan-400/10 p-2.5 text-cyan-200 transition duration-300 group-hover:border-orange-300/35 group-hover:bg-orange-400/15 group-hover:text-orange-200">
-                <feature.icon className="h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">{feature.title}</h3>
-              <p className="mt-2 text-sm text-slate-300">{feature.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="final-cta" className="relative z-10 px-6 py-28">
-        <div
-          data-reveal
-          className="mx-auto max-w-5xl rounded-3xl border border-cyan-300/20 bg-slate-900/60 p-10 text-center backdrop-blur-2xl sm:p-16"
-        >
-          <p className="text-sm uppercase tracking-[0.22em] text-orange-200/90">Get Started</p>
-          <h2 className="mt-4 text-4xl font-extrabold text-white sm:text-6xl">
-            Start tracking your bus now
-          </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-sm text-slate-300 sm:text-base">
-            Upgrade commute confidence with live visibility, smarter routing, and seamless
-            passenger-driver coordination.
-          </p>
-          <div className="mt-8">
-            <a
-              href="#"
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-200/45 bg-cyan-300/15 px-7 py-3.5 text-sm font-semibold text-cyan-100 transition duration-300 hover:bg-cyan-300/30 hover:shadow-[0_0_34px_rgba(6,182,212,0.45)]"
-            >
-              Launch NextStop
-              <ArrowRight className="h-4 w-4" />
-            </a>
+                <p className="card-text">{item}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      <style jsx global>{`
+      <section className="section section-full">
+        <div className="section-container solution-grid">
+          <div data-fade-up>
+            <p className="section-kicker section-kicker-orange">Solution</p>
+            <h2 className="section-title">Real-time transit intelligence in one platform.</h2>
+            <p className="section-text">
+              NextStop provides real-time bus tracking using shared driver location and
+              interactive route maps.
+            </p>
+          </div>
+
+          <div data-fade-up className="solution-card">
+            <div className="solution-glow" />
+            <div className="solution-stack">
+              <div className="solution-row">
+                <p className="solution-label">Live Feed</p>
+                <p className="solution-copy">Driver 24 is 2.3 km away. ETA 6 mins.</p>
+              </div>
+              <div className="solution-row">
+                <p className="solution-label solution-label-orange">Route Layer</p>
+                <p className="solution-copy">
+                  14 active stops visualized with live route progression.
+                </p>
+              </div>
+              <div className="solution-row">
+                <p className="solution-label">Secure Share</p>
+                <p className="solution-copy">
+                  Passenger visibility enabled via authenticated location sharing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-container">
+          <div data-fade-up className="section-header">
+            <p className="section-kicker">Features</p>
+            <h2 className="section-title">
+              Built for passengers, drivers, and operations teams.
+            </h2>
+          </div>
+
+          <div className="feature-grid">
+            {featureItems.map((feature) => (
+              <article key={feature.title} data-fade-up className="feature-card">
+                <div className="icon-pill">
+                  <feature.icon className="icon" />
+                </div>
+                <h3 className="feature-title">{feature.title}</h3>
+                <p className="feature-copy">{feature.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-final">
+        <div data-fade-up className="section-container final-card">
+          <h2 className="final-title">Start Tracking Your Bus Now</h2>
+          <p className="final-copy">
+            Move from uncertainty to confidence with real-time transit visibility.
+          </p>
+          <div className="hero-button-wrap">
+            <button type="button" onClick={() => navigate("/app")} className="btn btn-cyan">
+              Open NextStop App
+              <ArrowRight className="btn-icon" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <style>{`
         @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Space+Grotesk:wght@400;500;700;800&display=swap");
 
-        .particle {
-          animation-name: particleFloat;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.65));
+        .nextstop-landing {
+          position: relative;
+          overflow-x: clip;
+          background: #020617;
+          color: #e2e8f0;
+          font-family: "Space Grotesk", "Rajdhani", "Segoe UI", sans-serif;
         }
 
-        @keyframes particleFloat {
-          0%,
-          100% {
-            transform: translate3d(0, 0, 0);
+        .nextstop-ambient {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+        }
+
+        .nextstop-glow {
+          position: absolute;
+          border-radius: 999px;
+          filter: blur(56px);
+        }
+
+        .nextstop-glow-cyan {
+          width: 300px;
+          height: 300px;
+          left: -100px;
+          top: 96px;
+          background: rgba(6, 182, 212, 0.28);
+        }
+
+        .nextstop-glow-orange {
+          width: 300px;
+          height: 300px;
+          right: -120px;
+          top: 22%;
+          background: rgba(249, 115, 22, 0.2);
+        }
+
+        .hero-shell {
+          position: relative;
+          height: 300vh;
+        }
+
+        .hero-pin {
+          position: relative;
+          height: 100vh;
+          overflow: hidden;
+        }
+
+        .hero-canvas {
+          position: absolute;
+          inset: 0;
+          display: block;
+          width: 100%;
+          height: 100%;
+        }
+
+        .hero-overlay {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.45), rgba(2, 6, 23, 0.95));
+        }
+
+        .hero-loading {
+          position: absolute;
+          top: 24px;
+          right: 24px;
+          z-index: 22;
+          margin: 0;
+          border-radius: 8px;
+          border: 1px solid rgba(103, 232, 249, 0.35);
+          background: rgba(15, 23, 42, 0.72);
+          color: #cffafe;
+          padding: 6px 10px;
+          font-size: 12px;
+        }
+
+        .hero-text-stage {
+          position: absolute;
+          inset: 0;
+          z-index: 20;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 0 24px;
+        }
+
+        .hero-group {
+          position: absolute;
+          max-width: 920px;
+        }
+
+        .hero-title {
+          margin: 0;
+          font-size: clamp(3rem, 10vw, 6rem);
+          line-height: 1.02;
+          font-weight: 800;
+          letter-spacing: -0.04em;
+          background: linear-gradient(90deg, #bae6fd, #67e8f9, #fdba74);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
+
+        .hero-heading {
+          margin: 0;
+          font-size: clamp(2rem, 7.8vw, 4.2rem);
+          line-height: 1.06;
+          font-weight: 700;
+          color: #cffafe;
+        }
+
+        .hero-subtitle {
+          margin: 16px 0 0;
+          font-size: clamp(1rem, 2.6vw, 1.35rem);
+          color: #e2e8f0;
+        }
+
+        .hero-button-wrap {
+          margin-top: 28px;
+          display: flex;
+          justify-content: center;
+        }
+
+        .btn {
+          border: 1px solid;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+        }
+
+        .btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .btn-icon {
+          width: 16px;
+          height: 16px;
+        }
+
+        .btn-orange {
+          border-color: rgba(253, 186, 116, 0.55);
+          color: #ffedd5;
+          background: rgba(251, 146, 60, 0.2);
+        }
+
+        .btn-orange:hover {
+          background: rgba(251, 146, 60, 0.36);
+          box-shadow: 0 0 30px rgba(251, 146, 60, 0.42);
+        }
+
+        .btn-cyan {
+          border-color: rgba(165, 243, 252, 0.45);
+          color: #cffafe;
+          background: rgba(34, 211, 238, 0.16);
+        }
+
+        .btn-cyan:hover {
+          background: rgba(34, 211, 238, 0.3);
+          box-shadow: 0 0 34px rgba(6, 182, 212, 0.45);
+        }
+
+        .section {
+          position: relative;
+          padding: 96px 24px;
+        }
+
+        .section-full {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+        }
+
+        .section-problem {
+          background: linear-gradient(to bottom, #071126, #030917);
+        }
+
+        .section-container {
+          width: 100%;
+          max-width: 1120px;
+          margin: 0 auto;
+        }
+
+        .section-header {
+          max-width: 760px;
+          margin-bottom: 36px;
+        }
+
+        .section-kicker {
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+          font-size: 12px;
+          color: rgba(165, 243, 252, 0.95);
+        }
+
+        .section-kicker-orange {
+          color: rgba(254, 215, 170, 0.95);
+        }
+
+        .section-title {
+          margin: 12px 0 0;
+          font-size: clamp(2rem, 6vw, 3.25rem);
+          line-height: 1.08;
+          color: #ffffff;
+        }
+
+        .section-text {
+          margin: 24px 0 0;
+          max-width: 620px;
+          font-size: 1.12rem;
+          color: #cbd5e1;
+          line-height: 1.7;
+        }
+
+        .problem-grid,
+        .feature-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+
+        .glass-card,
+        .feature-card {
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(16px);
+          padding: 24px;
+          transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease;
+        }
+
+        .glass-card:hover,
+        .feature-card:hover {
+          transform: translateY(-6px);
+          border-color: rgba(103, 232, 249, 0.45);
+          background: rgba(34, 211, 238, 0.12);
+        }
+
+        .icon-pill {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(103, 232, 249, 0.4);
+          background: rgba(34, 211, 238, 0.12);
+          color: #a5f3fc;
+          margin-bottom: 14px;
+        }
+
+        .icon {
+          width: 18px;
+          height: 18px;
+        }
+
+        .card-text {
+          margin: 0;
+          color: #e2e8f0;
+          line-height: 1.6;
+        }
+
+        .solution-grid {
+          display: grid;
+          gap: 36px;
+          align-items: center;
+        }
+
+        .solution-card {
+          position: relative;
+          border: 1px solid rgba(103, 232, 249, 0.28);
+          border-radius: 22px;
+          background: rgba(15, 23, 42, 0.62);
+          backdrop-filter: blur(18px);
+          padding: 28px;
+          overflow: hidden;
+        }
+
+        .solution-glow {
+          position: absolute;
+          right: -36px;
+          top: -36px;
+          width: 120px;
+          height: 120px;
+          border-radius: 999px;
+          background: rgba(34, 211, 238, 0.24);
+          filter: blur(26px);
+          pointer-events: none;
+        }
+
+        .solution-stack {
+          display: grid;
+          gap: 14px;
+          position: relative;
+          z-index: 1;
+        }
+
+        .solution-row {
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.05);
+          padding: 14px;
+        }
+
+        .solution-label {
+          margin: 0;
+          color: rgba(165, 243, 252, 0.95);
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+
+        .solution-label-orange {
+          color: rgba(254, 215, 170, 0.95);
+        }
+
+        .solution-copy {
+          margin: 8px 0 0;
+          font-size: 14px;
+          color: #e2e8f0;
+          line-height: 1.5;
+        }
+
+        .feature-title {
+          margin: 0;
+          color: #ffffff;
+          font-size: 1.14rem;
+        }
+
+        .feature-copy {
+          margin: 10px 0 0;
+          color: #cbd5e1;
+          line-height: 1.58;
+          font-size: 14px;
+        }
+
+        .section-final {
+          padding-top: 24px;
+          padding-bottom: 96px;
+        }
+
+        .final-card {
+          border: 1px solid rgba(103, 232, 249, 0.22);
+          border-radius: 24px;
+          background: rgba(15, 23, 42, 0.62);
+          backdrop-filter: blur(18px);
+          padding: 40px 30px;
+          text-align: center;
+          max-width: 1024px;
+        }
+
+        .final-title {
+          margin: 0;
+          color: #ffffff;
+          line-height: 1.1;
+          font-size: clamp(2rem, 6vw, 3.8rem);
+        }
+
+        .final-copy {
+          margin: 18px auto 0;
+          max-width: 680px;
+          color: #cbd5e1;
+          line-height: 1.65;
+          font-size: 1rem;
+        }
+
+        @media (min-width: 760px) {
+          .problem-grid,
+          .feature-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
-          50% {
-            transform: translate3d(0, -22px, 0);
+        }
+
+        @media (min-width: 980px) {
+          .problem-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .solution-grid {
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
     </main>
   );
 }
+
