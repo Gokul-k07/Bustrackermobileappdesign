@@ -110,7 +110,7 @@ export default function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<'onboarding' | 'roleSelection' | 'main'>('onboarding');
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Driver state
   const [isOnline, setIsOnline] = useState(false);
@@ -171,17 +171,15 @@ export default function MainApp() {
   };
 
   const resetClientState = () => {
-    setSession(null);
     setUser(null);
+    setSession(null);
     setCurrentScreen('onboarding');
-    setIsOnline(false);
-    setIsLocationSharing(false);
-    setOtps([]);
-    setLocationShares([]);
-    setBusLocations([]);
     apiClient.setAccessToken(null);
+    // Clear storage on unauth
+    try {
+      localStorage.removeItem('busTrackerState');
+    } catch(e) {}
   };
-
   const initializeAuthenticatedApp = async (authSession: any) => {
     const initRunId = ++initRunIdRef.current;
 
@@ -643,6 +641,30 @@ export default function MainApp() {
     }
   };
 
+  const handleBypassAuth = () => {
+    const dummyUser: User = {
+      id: 'test-bypass-user-id',
+      name: 'Test Passenger',
+      email: 'test@example.com',
+      role: 'passenger',
+      coins: 999
+    };
+    setUser(dummyUser);
+    
+    const mockSession = { access_token: 'bypass-token', user: dummyUser };
+    setSession(mockSession);
+    
+    // We update the api client but calls lacking a real token might still fail,
+    // which is fine for local map rendering without backend dependencies.
+    apiClient.setAccessToken(mockSession.access_token);
+    
+    setCurrentScreen('main');
+    setActiveTab('map');
+    toast.success('Bypassed login for testing!', {
+      description: 'You are viewing the app in offline/test mode.'
+    });
+  };
+
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -888,6 +910,7 @@ export default function MainApp() {
       <OnboardingFlow 
         onComplete={handleCompleteOnboarding} 
         onSignIn={handleSignIn}
+        onBypass={handleBypassAuth}
       />
     );
   }

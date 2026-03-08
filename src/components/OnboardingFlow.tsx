@@ -11,9 +11,10 @@ import { apiClient } from '../utils/api';
 interface OnboardingFlowProps {
   onComplete: (user: { name: string; email: string; password: string; role: UserRole }) => Promise<void>;
   onSignIn: (email: string, password: string) => Promise<void>;
+  onBypass?: () => void;
 }
 
-export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
+export function OnboardingFlow({ onComplete, onSignIn, onBypass }: OnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSignUp, setIsSignUp] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -232,7 +233,16 @@ export function OnboardingFlow({ onComplete, onSignIn }: OnboardingFlowProps) {
               </Button>
             </div>
             
-            <p className="text-sm text-muted-foreground text-center">
+            {onBypass && (
+              <div className="text-center pt-2 border-t mt-4">
+                <Button variant="outline" size="sm" onClick={onBypass} className="w-full bg-yellow-50 hover:bg-yellow-100 text-yellow-800 border-yellow-200">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Test Mode (Bypass Login)
+                </Button>
+              </div>
+            )}
+            
+            <p className="text-sm text-muted-foreground text-center mt-4">
               By continuing, you agree to our Terms of Service and Privacy Policy
             </p>
           </CardContent>

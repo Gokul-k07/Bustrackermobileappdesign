@@ -45,6 +45,7 @@ export function MapView({
   const lastRouteUpdateRef = useRef<number>(0);
   const lastWaypointSignatureRef = useRef<string>('');
   const lastHighlightedRouteRef = useRef<string>('');
+  const osrmRouteCacheRef = useRef<{[key: string]: { coords: [number, number][], passed: boolean }[]}>({});
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBus, setSelectedBus] = useState<BusLocation | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
@@ -209,7 +210,7 @@ export function MapView({
     });
   };
 
-  // Load Leaflet + Leaflet Routing Machine
+  // Load Leaflet
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -252,27 +253,12 @@ export function MapView({
       }
     };
 
-    const loadRoutingMachine = () => {
-      ensureStyle('leaflet-routing-machine-css', 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css');
-
-      if (window.L?.Routing) {
-        markReady();
-        return;
-      }
-
-      ensureScript(
-        'leaflet-routing-machine-js',
-        'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js',
-        markReady
-      );
-    };
-
     ensureStyle('leaflet-css', 'https://unpkg.com/leaflet/dist/leaflet.css');
 
     if (window.L) {
-      loadRoutingMachine();
+      markReady();
     } else {
-      ensureScript('leaflet-js', 'https://unpkg.com/leaflet/dist/leaflet.js', loadRoutingMachine);
+      ensureScript('leaflet-js', 'https://unpkg.com/leaflet/dist/leaflet.js', markReady);
     }
 
     return () => {
@@ -412,7 +398,29 @@ export function MapView({
 
   }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
 
+  const BUS_58_HARDCODED_STOPS: BusStop[] = [
+    { id: '58-1', name: 'SILUKKUVAR PATTY', lat: 10.152112, lng: 77.885524, order: 1, passed: false },
+    { id: '58-2', name: 'NILAKOTTAI', lat: 10.165798, lng: 77.853887, order: 2, passed: false },
+    { id: '58-3', name: 'MICHAELPALAYAM', lat: 10.206797, lng: 77.866459, order: 3, passed: false },
+    { id: '58-4', name: 'AACHIPURAM', lat: 10.221177, lng: 77.868923, order: 4, passed: false },
+    { id: '58-5', name: 'OTTUPPATTY', lat: 10.229757, lng: 77.869848, order: 5, passed: false },
+    { id: '58-6', name: 'KAMAKKAPATTYPRIVU', lat: 10.258114, lng: 77.877726, order: 6, passed: false },
+    { id: '58-7', name: 'METTUPATTY', lat: 10.266290, lng: 77.875425, order: 7, passed: false },
+    { id: '58-8', name: 'SEMPATTI', lat: 10.281376, lng: 77.871654, order: 8, passed: false },
+    { id: '58-9', name: 'AADHILAKSHMI PURAM', lat: 10.295083, lng: 77.881313, order: 9, passed: false },
+    { id: '58-10', name: 'VEERAKKAL PIRIVU', lat: 10.313387, lng: 77.899780, order: 10, passed: false },
+    { id: '58-11', name: 'VAKKAMPATTY PIRIVU', lat: 10.321262, lng: 77.908559, order: 11, passed: false },
+    { id: '58-12', name: 'ARIYANALLUR PIRIVU', lat: 10.323641, lng: 77.913047, order: 12, passed: false },
+    { id: '58-13', name: 'PANJAM PATTY PIRIVU (WEST)', lat: 10.326345, lng: 77.918483, order: 13, passed: false },
+    { id: '58-14', name: 'PITHALAPATTY', lat: 10.333013, lng: 77.930254, order: 14, passed: false },
+    { id: '58-15', name: 'PSNACET', lat: 10.415425, lng: 77.900457, order: 15, passed: false }
+  ];
+
   const loadBusStopsForBus = async (bus: BusLocation): Promise<BusStop[]> => {
+    // FORCE hardcoded coordinates for Bus 58, overriding Supabase
+    if (bus.route && bus.route.toString().includes('58')) {
+      return BUS_58_HARDCODED_STOPS;
+    }
     try {
       const response = await apiClient.getBusStops(bus.id);
       return response.busStops || bus.busStops || [];
@@ -462,6 +470,18 @@ export function MapView({
       setShowBusDetails(false);
       setShowRouteView(true);
       drawRoutePath(onlineBus, stops, true);
+      return;
+    }
+
+    // Force hardcoded stops if offline and is Bus 58
+    if (busName.includes('58')) {
+      const routeBus = buildFallbackBusForRoute(busName, BUS_58_HARDCODED_STOPS);
+      setSelectedBus(routeBus);
+      setBusStops(BUS_58_HARDCODED_STOPS);
+      setEditedStops(BUS_58_HARDCODED_STOPS);
+      setShowBusDetails(false);
+      setShowRouteView(true);
+      drawRoutePath(routeBus, BUS_58_HARDCODED_STOPS, true);
       return;
     }
 
@@ -517,19 +537,6 @@ export function MapView({
       delete markersRef.current['routeLayer'];
     }
 
-    if (routingControlRef.current) {
-      if (removeRoutingControl) {
-        mapInstance.current.removeControl(routingControlRef.current);
-        routingControlRef.current = null;
-      } else {
-        try {
-          routingControlRef.current.setWaypoints([]);
-        } catch (error) {
-          console.warn('Failed to clear routing waypoints:', error);
-        }
-      }
-    }
-
     lastRouteUpdateRef.current = 0;
     lastWaypointSignatureRef.current = '';
   };
@@ -551,56 +558,22 @@ export function MapView({
     });
   };
 
-  const ensureRoutingControl = (map: any, L: any) => {
-    if (routingControlRef.current) {
-      return routingControlRef.current;
-    }
-
-    if (!L?.Routing) {
-      return null;
-    }
-
-    const routingControl = L.Routing.control({
-      waypoints: [],
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1'
-      }),
-      addWaypoints: false,
-      draggableWaypoints: false,
-      routeWhileDragging: false,
-      showAlternatives: false,
-      fitSelectedRoutes: false,
-      show: false,
-      createMarker: () => null,
-      lineOptions: {
-        styles: [{ color: '#ec4899', weight: 6, opacity: 0.9 }]
-      }
-    }).addTo(map);
-
-    const itineraryContainer = routingControl.getContainer?.();
-    if (itineraryContainer) {
-      itineraryContainer.style.display = 'none';
-    }
-
-    routingControl.on('routingerror', (error: any) => {
-      console.warn('OSRM routing failed:', error);
-    });
-
-    routingControlRef.current = routingControl;
-    return routingControl;
-  };
-
-  const drawRoutePath = (bus: BusLocation, stops: BusStop[], forceUpdate = false) => {
+  const drawRoutePath = (bus: BusLocation, inputStops: BusStop[], forceUpdate = false) => {
     if (!mapInstance.current || !mapLoaded) return;
+    
+    let stops = inputStops;
+    
+    // ABSOLUTE FORCE: If this is Bus 58, completely override whatever stops were passed in.
+    if (bus.route && bus.route.toString().includes('58')) {
+      stops = BUS_58_HARDCODED_STOPS;
+    }
     
     const L = window.L;
     const map = mapInstance.current;
-    const stopCoordinates = getStopCoordinates(bus, stops);
-
-    if (!window.L?.Routing) {
-      console.warn('Leaflet Routing Machine is not available');
-      return;
-    }
+    
+    // Sort stops to ensure they are in order
+    const sortedStops = [...stops].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const stopCoordinates = getStopCoordinates(bus, sortedStops);
 
     if (!routeLayerRef.current) {
       routeLayerRef.current = L.layerGroup().addTo(map);
@@ -609,27 +582,133 @@ export function MapView({
 
     const routeLayer = routeLayerRef.current;
     const shouldRedrawStops = forceUpdate || routeLayer.getLayers().length === 0;
+
+    // Build coordinate list for the polyline
+    // First, find if the bus is online and valid.
+    const busLatLng = bus.isOnline && isValidCoordinate(bus.lat, bus.lng) 
+      ? L.latLng(bus.lat, bus.lng) 
+      : null;
+
     if (shouldRedrawStops) {
       routeLayer.clearLayers();
 
-      // Add stop markers
+      // Create a unique signature for the current stops and their 'passed' status
+      const signature = stopCoordinates.map(s => `${s.lat},${s.lng},${s.stop.passed}`).join('|');
+
+      const drawOSRM = async () => {
+        // If we don't have the cached route, fetch it
+        if (!osrmRouteCacheRef.current[signature]) {
+          const coordsString = stopCoordinates.map(s => `${s.lng},${s.lat}`).join(';');
+          const url = `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=false&steps=true&geometries=geojson`;
+          
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+              const legPaths = data.routes[0].legs.map((leg: any, i: number) => {
+                const passed = stopCoordinates[i+1]?.stop?.passed || false;
+                let coords: [number, number][] = [];
+                
+                if (leg.steps) {
+                  leg.steps.forEach((step: any) => {
+                    if (step.geometry && step.geometry.coordinates) {
+                      step.geometry.coordinates.forEach((c: any) => {
+                        coords.push([c[1], c[0]]); // OSRM gives [lng, lat], Leaflet needs [lat, lng]
+                      });
+                    }
+                  });
+                }
+                return { coords, passed };
+              });
+              osrmRouteCacheRef.current[signature] = legPaths;
+            }
+          } catch (err) {
+            console.error("OSRM fetch failed:", err);
+          }
+        }
+
+        // Draw the cached route legs
+        const cachedLegs = osrmRouteCacheRef.current[signature];
+        if (cachedLegs) {
+          cachedLegs.forEach((leg) => {
+            if (leg.coords.length > 0) {
+              const pathColor = leg.passed ? '#9ca3af' : '#ef4444'; // Grey or Red
+              
+              const segmentLine = L.polyline(leg.coords, {
+                color: pathColor,
+                weight: 6,
+                opacity: 0.9,
+                lineCap: 'round',
+                lineJoin: 'round'
+              });
+              segmentLine.addTo(routeLayer);
+            }
+          });
+        }
+      };
+
+      // Call the async draw function
+      drawOSRM();
+      
+      // If we have a live bus, draw a thick line from the last passed stop to the bus
+      // and from the bus to the next un-passed stop
+      if (busLatLng && stopCoordinates.length > 0) {
+        // Find the next active stop (the first stop that is NOT passed)
+        const nextActiveStopIndex = stopCoordinates.findIndex(sc => !sc.stop.passed);
+        
+        if (nextActiveStopIndex > 0) {
+          // Bus is between last passed stop and next active stop
+          const lastPassedStop = stopCoordinates[nextActiveStopIndex - 1];
+          const nextActiveStop = stopCoordinates[nextActiveStopIndex];
+          
+          // Last passed stop to bus => Traveled (Grey)
+          if (isValidCoordinate(lastPassedStop.lat, lastPassedStop.lng)) {
+             L.polyline([[lastPassedStop.lat, lastPassedStop.lng], busLatLng], {
+               color: '#9ca3af', weight: 6, opacity: 0.9
+             }).addTo(routeLayer);
+             
+             // Bus to next stop => Untraveled (Red)
+             if (isValidCoordinate(nextActiveStop.lat, nextActiveStop.lng)) {
+                L.polyline([busLatLng, [nextActiveStop.lat, nextActiveStop.lng]], {
+                 color: '#ef4444', weight: 6, opacity: 0.9
+               }).addTo(routeLayer);
+             }
+          }
+        } else if (nextActiveStopIndex === 0) {
+           // Bus hasn't reached the first stop yet
+           const firstStop = stopCoordinates[0];
+           L.polyline([busLatLng, [firstStop.lat, firstStop.lng]], {
+               color: '#ef4444', weight: 6, opacity: 0.9
+           }).addTo(routeLayer);
+        }
+      }
+
+      // Add stop markers on top of the lines
       stopCoordinates.forEach(({ lat, lng, stop, index }) => {
         const stopIcon = L.divIcon({
           html: `
             <div style="
-              background: ${stop.passed ? '#6b7280' : '#ec4899'};
-              width: 20px;
-              height: 20px;
-              border-radius: 50%;
-              border: 2px solid white;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.4);
               display: flex;
+              flex-direction: column;
               align-items: center;
-              justify-content: center;
-              color: white;
-              font-size: 10px;
-              font-weight: bold;
-            ">${index + 1}</div>
+              gap: 4px;
+            ">
+              <div style="
+                background: ${stop.passed ? '#9ca3af' : '#ef4444'};
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+              ">${index + 1}</div>
+            </div>
           `,
           className: 'custom-marker',
           iconSize: [24, 24],
@@ -642,42 +721,20 @@ export function MapView({
       });
     }
 
-    // Route path order: starting point -> live bus (if online) -> all stops/destination
-    const waypointLatLngs = [L.latLng(currentLocation.lat, currentLocation.lng)];
-
-    if (bus.isOnline && isValidCoordinate(bus.lat, bus.lng)) {
-      waypointLatLngs.push(L.latLng(bus.lat, bus.lng));
-    }
-
-    waypointLatLngs.push(...stopCoordinates.map(({ lat, lng }) => L.latLng(lat, lng)));
-
-    if (waypointLatLngs.length < 2) {
-      return;
-    }
-
-    const waypointSignature = waypointLatLngs
-      .map((waypoint: any) => `${waypoint.lat.toFixed(6)},${waypoint.lng.toFixed(6)}`)
-      .join('|');
-
-    if (!forceUpdate && waypointSignature === lastWaypointSignatureRef.current) {
-      return;
-    }
-
-    const now = Date.now();
-    if (!forceUpdate && now - lastRouteUpdateRef.current < ROUTE_REFRESH_INTERVAL_MS) {
-      return;
-    }
-
-    const routingControl = ensureRoutingControl(map, L);
-    if (!routingControl) return;
-
-    lastRouteUpdateRef.current = now;
-    lastWaypointSignatureRef.current = waypointSignature;
-    routingControl.setWaypoints(waypointLatLngs);
-
-    if (forceUpdate) {
+    if (forceUpdate && stopCoordinates.length > 0) {
+      const waypointLatLngs = stopCoordinates.map(s => L.latLng(s.lat, s.lng));
+      if (busLatLng) waypointLatLngs.push(busLatLng);
+      
       const bounds = L.latLngBounds(waypointLatLngs);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      Object.values(markersRef.current).forEach((marker: any) => {
+        if (marker.getLatLng) {
+           bounds.extend(marker.getLatLng());
+        }
+      });
+      // Center and fit bounds
+      if (waypointLatLngs.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
     }
   };
 

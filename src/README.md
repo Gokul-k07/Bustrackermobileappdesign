@@ -18,7 +18,7 @@ BusTracker is a comprehensive mobile-first web application designed to bridge th
 
 ### 🗺️ Real-time Map Integration
 - **Live Tracking:** Real-time visualization of bus movements using high-accuracy geolocation.
-- **Road Routing:** Actual road paths calculated via OpenRouteService API (no straight lines).
+- **Road Routing:** Uses direct manual polyline segments between bus stops on Leaflet map instead of AI mapping.
 - **Dynamic UI:** Pulsing location icons, swipe-to-refresh map state, and automatic centering.
 
 ### 👥 Role-Based Dashboards

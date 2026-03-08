@@ -140,6 +140,36 @@ async function getDefaultRoutesForBus(busName: string) {
   if (!availableBuses.includes(busName)) {
     return []
   }
+
+  // Inject coordinate mapping specifically for PSNA-58 as hardcoded by the user
+  if (busName === "PSNA-58") {
+    const predefinedStopsFor58 = [
+      { name: "SILUKKUVAR PATTY", lat: 10.152112, lng: 77.885524 },
+      { name: "NILAKOTTAI", lat: 10.165798, lng: 77.853887 },
+      { name: "MICHAELPALAYAM", lat: 10.206797, lng: 77.866459 },
+      { name: "AACHIPURAM", lat: 10.221177, lng: 77.868923 },
+      { name: "OTTUPPATTY", lat: 10.229757, lng: 77.869848 },
+      { name: "KAMAKKAPATTYPRIVU", lat: 10.258114, lng: 77.877726 },
+      { name: "METTUPATTY", lat: 10.266290, lng: 77.875425 },
+      { name: "SEMPATTI", lat: 10.281376, lng: 77.871654 },
+      { name: "AADHILAKSHMI PURAM", lat: 10.295083, lng: 77.881313 },
+      { name: "VEERAKKAL PIRIVU", lat: 10.313387, lng: 77.899780 },
+      { name: "VAKKAMPATTY PIRIVU", lat: 10.321262, lng: 77.908559 },
+      { name: "ARIYANALLUR PIRIVU", lat: 10.323641, lng: 77.913047 },
+      { name: "PANJAM PATTY PIRIVU (WEST)", lat: 10.326345, lng: 77.918483 },
+      { name: "PITHALAPATTY", lat: 10.333013, lng: 77.930254 },
+      { name: "PSNACET", lat: 10.415425, lng: 77.900457 }
+    ];
+
+    return predefinedStopsFor58.map((stop, index) => ({
+      id: `${busName}_stop_${index + 1}`,
+      name: stop.name,
+      order: index + 1,
+      passed: false,
+      lat: stop.lat,
+      lng: stop.lng
+    }));
+  }
   
   // Return default routes if available for this registered bus
   if (DEFAULT_BUS_ROUTES[busName]) {
@@ -162,61 +192,7 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Proxy road directions to avoid browser CORS issues with OpenRouteService
-app.post('/route/directions', async (c) => {
-  try {
-    const { coordinates } = await c.req.json()
-
-    if (!Array.isArray(coordinates) || coordinates.length < 2) {
-      return c.json({ error: 'At least 2 coordinates are required' }, 400)
-    }
-
-    const validCoordinates = coordinates.every((point: any) =>
-      Array.isArray(point) &&
-      point.length === 2 &&
-      Number.isFinite(point[0]) &&
-      Number.isFinite(point[1])
-    )
-
-    if (!validCoordinates) {
-      return c.json({ error: 'Invalid coordinates format' }, 400)
-    }
-
-    const orsApiKey =
-      Deno.env.get('OPENROUTESERVICE_API_KEY') ||
-      '5b3ce3597851110001cf6248daf7f456fc7644888f8e8c5e08c88ce4'
-
-    const orsResponse = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': orsApiKey
-      },
-      body: JSON.stringify({ coordinates })
-    })
-
-    if (!orsResponse.ok) {
-      const orsErrorText = await orsResponse.text().catch(() => '')
-      console.log('OpenRouteService error:', orsResponse.status, orsErrorText)
-      return c.json({ error: 'Failed to fetch route directions' }, 502)
-    }
-
-    const orsData = await orsResponse.json()
-    const routeCoordinates = orsData?.routes?.[0]?.geometry?.coordinates
-
-    if (!Array.isArray(routeCoordinates)) {
-      return c.json({ error: 'No route geometry returned' }, 502)
-    }
-
-    return c.json({
-      success: true,
-      coordinates: routeCoordinates
-    })
-  } catch (error) {
-    console.log('Route directions proxy error:', error)
-    return c.json({ error: 'Failed to process route directions request' }, 500)
-  }
-})
+// Route endpoint removed per manual configuration requirement
 
 // User registration
 app.post('/register', async (c) => {

