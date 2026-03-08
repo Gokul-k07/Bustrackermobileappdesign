@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Bus, Users, Coins, Settings, Play, Square, QrCode, Share2, MessageSquare, Send, Loader2, Bell, Shield } from 'lucide-react';
+import { MapPin, Bus, Coins, Settings, MessageSquare, Send, Loader2, Bell, Shield } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
@@ -20,6 +20,7 @@ import { PassengerDashboard } from './components/PassengerDashboard';
 import { MapView } from './components/MapView';
 import { AIChat } from './components/AIChat';
 import { AdminDashboard } from './components/AdminDashboard';
+import { NotificationFeature, NotificationsCenter } from './components/NotificationsCenter';
 
 export type UserRole = 'driver' | 'passenger' | 'admin' | null;
 
@@ -74,7 +75,7 @@ export interface OTP {
 const ADMIN_ACCESS_EMAIL = 'gokulk24cb@psnacet.edu.in';
 const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
 
-const FUTURE_NOTIFICATIONS = [
+const FUTURE_NOTIFICATIONS: NotificationFeature[] = [
   {
     title: 'Bus Stop Proximity Alert',
     detail: 'Notify driver and passengers when bus is within 50 meters of the next stop.'
@@ -128,6 +129,7 @@ export default function MainApp() {
   // Navigation state
   const [activeTab, setActiveTab] = useState('home');
   const [highlightBusRouteName, setHighlightBusRouteName] = useState<string | null>(null);
+  const [activeDriverBusName, setActiveDriverBusName] = useState('');
   
   // Bus selection and available buses
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
@@ -138,7 +140,6 @@ export default function MainApp() {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [feedbackType, setFeedbackType] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
 
   const getMapStateFromUrl = () => {
     if (typeof window === 'undefined') {
@@ -179,6 +180,7 @@ export default function MainApp() {
     setOtps([]);
     setLocationShares([]);
     setBusLocations([]);
+    setActiveDriverBusName('');
     apiClient.setAccessToken(null);
   };
 
@@ -235,18 +237,22 @@ export default function MainApp() {
 
         setOtps(otpsData.otps || []);
         setLocationShares(sharesData.shares || []);
-        setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
+        const liveDriverBus = onlineBuses.find((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline);
+        setIsOnline(Boolean(liveDriverBus));
+        setActiveDriverBusName(liveDriverBus?.route || '');
         setIsLocationSharing(false);
       } else if (effectiveRole === 'passenger') {
         setOtps([]);
         setLocationShares([]);
         setIsOnline(false);
         setIsLocationSharing(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
+        setActiveDriverBusName('');
       } else {
         setOtps([]);
         setLocationShares([]);
         setIsOnline(false);
         setIsLocationSharing(false);
+        setActiveDriverBusName('');
       }
     } catch (error: any) {
       console.warn('Authentication initialization failed:', error.message || error);
@@ -459,20 +465,26 @@ export default function MainApp() {
               apiClient.getDriverOTPs().catch(() => ({ otps: [] })),
               apiClient.getLocationShares().catch(() => ({ shares: [] }))
             ]);
+            const liveDriverBus = onlineBuses.find((bus: BusLocation) => bus.id === user.id && bus.isOnline);
 
             setOtps(otpsData.otps || []);
             setLocationShares(sharesData.shares || []);
-            setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
+            setIsOnline(Boolean(liveDriverBus));
+            if (liveDriverBus?.route) {
+              setActiveDriverBusName(liveDriverBus.route);
+            }
           } else if (user.role === 'passenger') {
             setOtps([]);
             setLocationShares([]);
             setIsOnline(false);
             setIsLocationSharing(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
+            setActiveDriverBusName('');
           } else {
             setOtps([]);
             setLocationShares([]);
             setIsOnline(false);
             setIsLocationSharing(false);
+            setActiveDriverBusName('');
           }
         } catch (error: any) {
           if (error.message && !error.message.includes('Authentication failed')) {
@@ -539,7 +551,12 @@ export default function MainApp() {
                     localStorage.removeItem('bustracker_sharing_state');
                   }
                 } else if (user.role === 'driver' && isOnline) {
-                  await apiClient.updateDriverStatus(true, newLocation);
+                  await apiClient.updateDriverStatus(
+                    true,
+                    newLocation,
+                    activeDriverBusName || undefined,
+                    activeDriverBusName || undefined
+                  );
                 }
               } catch (error: any) {
                 if (error.message?.includes('expired')) {
@@ -567,7 +584,12 @@ export default function MainApp() {
               await apiClient.updateLocation(currentLocation);
             } else if (user.role === 'driver' && isOnline) {
               // Update driver's bus location
-              await apiClient.updateDriverStatus(true, currentLocation);
+              await apiClient.updateDriverStatus(
+                true,
+                currentLocation,
+                activeDriverBusName || undefined,
+                activeDriverBusName || undefined
+              );
             }
           } catch (error) {
             console.error('Failed to update location:', error);
@@ -582,7 +604,7 @@ export default function MainApp() {
         };
       }
     }
-  }, [isLocationSharing, isOnline, locationPermissionGranted, currentLocation, user]);
+  }, [isLocationSharing, isOnline, locationPermissionGranted, currentLocation, user, activeDriverBusName]);
 
   const loadBusLocations = async () => {
     try {
@@ -752,19 +774,23 @@ export default function MainApp() {
   const toggleDriverOnline = async (busName?: string) => {
     try {
       const newOnlineStatus = !isOnline;
+      const nextBusName = newOnlineStatus
+        ? (busName || activeDriverBusName || '').trim()
+        : activeDriverBusName;
       
       await apiClient.updateDriverStatus(
         newOnlineStatus,
         newOnlineStatus ? currentLocation : undefined,
-        busName,
-        busName
+        newOnlineStatus ? nextBusName : undefined,
+        newOnlineStatus ? nextBusName : undefined
       );
       
       setIsOnline(newOnlineStatus);
+      setActiveDriverBusName(newOnlineStatus ? nextBusName : '');
       
       if (newOnlineStatus) {
         toast.success('You are now online', {
-          description: `Your bus "${busName}" is now sharing location with passengers`
+          description: `Your bus "${nextBusName}" is now sharing location with passengers`
         });
       } else {
         toast.info('You are now offline', {
@@ -897,6 +923,11 @@ export default function MainApp() {
   }
 
   const hasAdminPanelAccess = user.role === 'admin' || normalizeEmail(user.email) === ADMIN_ACCESS_EMAIL;
+  const liveDriverBus = user.role === 'driver'
+    ? busLocations.find((bus) => bus.id === user.id && bus.isOnline) || null
+    : null;
+  const currentDriverBusName = liveDriverBus?.route || activeDriverBusName;
+  const bottomNavColumns = hasAdminPanelAccess ? 'grid-cols-5' : 'grid-cols-4';
 
   return (
     <div className="min-h-screen bg-background">
@@ -921,31 +952,14 @@ export default function MainApp() {
             <Badge variant={user.role === 'admin' ? 'destructive' : (isOnline && user.role === 'driver' ? 'default' : 'secondary')}>
               {user.role === 'admin' ? 'Admin' : (user.role === 'driver' ? (isOnline ? 'Online' : 'Offline') : 'Passenger')}
             </Badge>
-            <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                  <Bell className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Notification Menu</DialogTitle>
-                  <DialogDescription>
-                    Planned system alerts and upgrades.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                  {FUTURE_NOTIFICATIONS.map((item) => (
-                    <Card key={item.title}>
-                      <CardContent className="p-3">
-                        <p className="font-medium text-sm">{item.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => setActiveTab('notifications')}
+            >
+              <Bell className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -984,6 +998,17 @@ export default function MainApp() {
           {activeTab === 'admin' && hasAdminPanelAccess && (
             <div className="p-4">
               <AdminDashboard currentUser={user} />
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="p-4">
+              <NotificationsCenter
+                userRole={user.role}
+                canBroadcast={user.role === 'driver' && isOnline && Boolean(currentDriverBusName)}
+                activeBusName={currentDriverBusName}
+                futureNotifications={FUTURE_NOTIFICATIONS}
+              />
             </div>
           )}
           
@@ -1118,7 +1143,7 @@ export default function MainApp() {
 
         {/* Bottom Navigation - Always visible */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-30 shadow-lg">
-          <div className={`grid ${hasAdminPanelAccess ? 'grid-cols-4' : 'grid-cols-3'} p-4`}>
+          <div className={`grid ${bottomNavColumns} gap-2 p-4`}>
             <Button 
               variant={activeTab === 'home' ? 'default' : 'ghost'} 
               className="flex flex-col items-center gap-1 h-auto py-2"
@@ -1134,6 +1159,14 @@ export default function MainApp() {
             >
               <Bus className="h-4 w-4" />
               <span className="text-xs">Map</span>
+            </Button>
+            <Button
+              variant={activeTab === 'notifications' ? 'default' : 'ghost'}
+              className="flex flex-col items-center gap-1 h-auto py-2"
+              onClick={() => setActiveTab('notifications')}
+            >
+              <Bell className="h-4 w-4" />
+              <span className="text-xs">Alerts</span>
             </Button>
             {hasAdminPanelAccess && (
               <Button 

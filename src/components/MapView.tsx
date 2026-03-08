@@ -60,6 +60,17 @@ export function MapView({
   const onlineBuses = busLocations.filter(bus => bus.isOnline);
 
   const normalizeBusRouteName = (value: string | null | undefined) => (value || '').trim().toUpperCase();
+  const serializeStops = (stops: BusStop[] = []) =>
+    JSON.stringify(
+      stops.map((stop) => ({
+        id: stop.id,
+        name: stop.name,
+        lat: stop.lat,
+        lng: stop.lng,
+        order: stop.order,
+        passed: stop.passed,
+      }))
+    );
 
   const isValidCoordinate = (lat: number, lng: number) =>
     Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
@@ -711,14 +722,33 @@ export function MapView({
     );
     if (!latestBus) return;
 
-    if (
+    const latestBusStops = latestBus.busStops || [];
+    const selectedBusStops = selectedBus.busStops || [];
+    const busChanged =
       latestBus.lat !== selectedBus.lat ||
       latestBus.lng !== selectedBus.lng ||
-      latestBus.lastUpdated !== selectedBus.lastUpdated
-    ) {
+      latestBus.lastUpdated !== selectedBus.lastUpdated ||
+      latestBus.route !== selectedBus.route ||
+      serializeStops(latestBusStops) !== serializeStops(selectedBusStops);
+
+    if (busChanged) {
       setSelectedBus(latestBus);
     }
-  }, [onlineBuses, selectedBus?.id, selectedBus?.lat, selectedBus?.lng, selectedBus?.lastUpdated]);
+
+    if (!editingStops && serializeStops(latestBusStops) !== serializeStops(busStops)) {
+      setBusStops(latestBusStops);
+      setEditedStops(latestBusStops);
+    }
+  }, [
+    onlineBuses,
+    selectedBus?.id,
+    selectedBus?.lat,
+    selectedBus?.lng,
+    selectedBus?.lastUpdated,
+    selectedBus?.route,
+    busStops,
+    editingStops,
+  ]);
 
   // Force route draw when route view opens or stop list changes
   useEffect(() => {
@@ -750,13 +780,16 @@ export function MapView({
     if (userRole !== 'driver') return;
     
     try {
-      await apiClient.updateBusStop(stopId, !currentPassed);
-      setBusStops(prev => prev.map(stop => 
-        stop.id === stopId ? { ...stop, passed: !currentPassed } : stop
-      ));
-      setEditedStops(prev => prev.map(stop => 
-        stop.id === stopId ? { ...stop, passed: !currentPassed } : stop
-      ));
+      const response = await apiClient.updateBusStop(stopId, !currentPassed);
+      const updatedStops =
+        response.busStops ||
+        busStops.map(stop =>
+          stop.id === stopId ? { ...stop, passed: !currentPassed } : stop
+        );
+
+      setBusStops(updatedStops);
+      setEditedStops(updatedStops);
+      setSelectedBus(prev => (prev ? { ...prev, busStops: updatedStops } : prev));
       toast.success('Route status updated');
     } catch (error) {
       console.error('Failed to update bus stop:', error);
@@ -792,8 +825,12 @@ export function MapView({
     if (userRole !== 'driver' || !selectedBus) return;
     
     try {
-      await apiClient.updateBusStops(selectedBus.id, editedStops);
-      setBusStops(editedStops);
+      const response = await apiClient.updateBusStops(selectedBus.id, editedStops);
+      const savedStops = response.busStops || editedStops;
+
+      setBusStops(savedStops);
+      setEditedStops(savedStops);
+      setSelectedBus(prev => (prev ? { ...prev, busStops: savedStops } : prev));
       setEditingStops(false);
       toast.success('Routes saved successfully');
     } catch (error) {
@@ -814,6 +851,7 @@ export function MapView({
       const updatedStops = response.busStops || [];
       setBusStops(updatedStops);
       setEditedStops(updatedStops);
+      setSelectedBus(prev => (prev ? { ...prev, busStops: updatedStops } : prev));
       setNewRouteName('');
       toast.success('Route added successfully');
     } catch (error) {

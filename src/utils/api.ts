@@ -28,6 +28,16 @@ export interface RouteStopsResponse {
   };
 }
 
+export interface LiveNotification {
+  id: string;
+  driverId: string;
+  driverName: string;
+  busName: string;
+  message: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 class ApiClient {
   private accessToken: string | null = null;
   private validKitKey = "vk_prod_931cac0aba91c7202eea55da";
@@ -232,6 +242,17 @@ class ApiClient {
   async getRouteStopsByBusName(busName: string): Promise<RouteStopsResponse> {
     const encodedBusName = encodeURIComponent(busName.trim());
     return this.request(`/route/stops?busName=${encodedBusName}`);
+  }
+
+  async getNotifications(): Promise<{ notifications: LiveNotification[] }> {
+    return this.request('/notifications');
+  }
+
+  async sendDriverNotification(message: string): Promise<{ success: boolean; notification: LiveNotification }> {
+    return this.request('/driver/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
   }
 
   async chatbot(message: string): Promise<ChatbotResponse> {

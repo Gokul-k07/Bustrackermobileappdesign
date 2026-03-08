@@ -157,6 +157,64 @@ async function getDefaultRoutesForBus(busName: string) {
   return []
 }
 
+const NOTIFICATION_TTL_MS = 24 * 60 * 60 * 1000
+
+const sanitizeCoordinate = (value: unknown) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const normalizeBusStops = (busName: string, busStops: any[], preservePassed = false) => {
+  if (!Array.isArray(busStops)) return []
+
+  return busStops.map((stop, index) => ({
+    id: stop?.id || `${busName}_stop_${index + 1}`,
+    name: typeof stop?.name === 'string' && stop.name.trim() ? stop.name.trim() : `Stop ${index + 1}`,
+    order: index + 1,
+    passed: preservePassed ? Boolean(stop?.passed) : false,
+    lat: sanitizeCoordinate(stop?.lat),
+    lng: sanitizeCoordinate(stop?.lng)
+  }))
+}
+
+const buildPreviousLocations = (existingLocations: any[], currentPoint?: { lat: number; lng: number; timestamp: string | null }) => {
+  const previousLocations = Array.isArray(existingLocations) ? [...existingLocations] : []
+
+  if (currentPoint && Number.isFinite(currentPoint.lat) && Number.isFinite(currentPoint.lng)) {
+    previousLocations.push(currentPoint)
+  }
+
+  return previousLocations.slice(-10)
+}
+
+async function persistRouteStops(busName: string, busStops: any[]) {
+  const normalizedStops = normalizeBusStops(busName, busStops, false)
+  await kv.set(`bus_routes:${busName}`, normalizedStops)
+  return normalizedStops
+}
+
+async function getActiveNotifications() {
+  const now = Date.now()
+  const notifications = await kv.getByPrefix('notification:')
+  const activeNotifications = []
+
+  for (const notification of notifications) {
+    const expiresAt = new Date(notification?.expiresAt || 0).getTime()
+    if (expiresAt > now) {
+      activeNotifications.push(notification)
+      continue
+    }
+
+    if (notification?.id) {
+      await kv.del(notification.id).catch(() => undefined)
+    }
+  }
+
+  return activeNotifications.sort((a, b) =>
+    new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  )
+}
+
 // Routes
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
@@ -485,15 +543,27 @@ app.post('/driver/status', async (c) => {
 
   try {
     const { isOnline, location, route, busName } = await c.req.json()
-    
+    const nowIso = new Date().toISOString()
+
     // Get user data for trip count tracking
     const userData = await kv.get(`user:${user.id}`)
     if (!userData) {
       return c.json({ error: 'User not found' }, 404)
     }
 
+    const existingDriverData = await kv.get(`driver:${user.id}`)
+    const existingBusData = await kv.get(`bus:${user.id}`)
+    const activeRoute = (route || busName || existingBusData?.route || existingDriverData?.route || '').trim()
+    const wasOnline = Boolean(existingDriverData?.isOnline)
+    const nextLocation =
+      location ||
+      existingDriverData?.currentLocation ||
+      (existingBusData ? { lat: existingBusData.lat, lng: existingBusData.lng } : null)
+    const startingTrip = Boolean(isOnline && !wasOnline && activeRoute && nextLocation)
+    const stoppingTrip = Boolean(!isOnline && wasOnline)
+
     // Check trip limits (5 trips per day)
-    if (isOnline && busName) {
+    if (startingTrip) {
       const today = new Date().toDateString()
       const tripHistory = userData.tripHistory || []
       const todaysTrips = tripHistory.filter((trip: any) => 
@@ -507,32 +577,49 @@ app.post('/driver/status', async (c) => {
       // Validate bus name uniqueness
       const allBuses = await kv.getByPrefix('bus:')
       const existingBus = allBuses.find(bus => 
-        bus.route === busName && bus.id !== user.id && bus.isOnline
+        bus.route === activeRoute && bus.id !== user.id && bus.isOnline
       )
       
       if (existingBus) {
         return c.json({ error: 'This bus location is already being shared' }, 400)
       }
     }
-    
+
+    if (isOnline && (!activeRoute || !nextLocation)) {
+      return c.json({ error: 'Bus name and location are required to stay online' }, 400)
+    }
+
+    const currentPoint =
+      existingBusData && Number.isFinite(existingBusData.lat) && Number.isFinite(existingBusData.lng)
+        ? {
+            lat: existingBusData.lat,
+            lng: existingBusData.lng,
+            timestamp: existingBusData.lastUpdated || null
+          }
+        : undefined
+
+    const previousLocations = buildPreviousLocations(
+      existingBusData?.previousLocations || existingDriverData?.previousLocations || [],
+      isOnline ? currentPoint : undefined
+    )
+
     const driverData = {
       isOnline,
-      route: route || busName || '',
-      currentLocation: location,
-      lastUpdated: new Date().toISOString(),
-      tripStartTime: isOnline ? new Date().toISOString() : null,
-      previousLocations: [] // Track for speed/heading calculation
+      route: activeRoute,
+      currentLocation: isOnline ? nextLocation : null,
+      lastUpdated: nowIso,
+      tripStartTime: isOnline ? (existingDriverData?.tripStartTime || nowIso) : null,
+      previousLocations
     }
 
     await kv.set(`driver:${user.id}`, driverData)
 
     // Track trip history and award coins for location sharing
-    if (isOnline && location && busName) {
-      // Check if this is a new trip
+    if (startingTrip) {
       const tripHistory = userData.tripHistory || []
       const newTrip = {
-        busName,
-        startTime: new Date().toISOString(),
+        busName: activeRoute,
+        startTime: nowIso,
         endTime: null
       }
       
@@ -542,40 +629,35 @@ app.post('/driver/status', async (c) => {
         tripHistory: [...tripHistory, newTrip]
       }
       await kv.set(`user:${user.id}`, updatedUser)
-    } else if (!isOnline) {
+    } else if (stoppingTrip) {
       // Mark trip as ended
       const tripHistory = userData.tripHistory || []
       if (tripHistory.length > 0) {
         const lastTrip = tripHistory[tripHistory.length - 1]
         if (!lastTrip.endTime) {
-          lastTrip.endTime = new Date().toISOString()
+          lastTrip.endTime = nowIso
           await kv.set(`user:${user.id}`, { ...userData, tripHistory })
         }
       }
     }
 
     // Store in bus locations for passengers to see
-    if (isOnline && location && busName) {
-      const userData = await kv.get(`user:${user.id}`)
-      
-      // Create sample bus stops for demonstration
-      const busStops = [
-        { id: `${user.id}_stop_1`, name: 'Main Station', lat: location.lat + 0.001, lng: location.lng + 0.001, order: 1, passed: false },
-        { id: `${user.id}_stop_2`, name: 'Central Plaza', lat: location.lat + 0.002, lng: location.lng + 0.002, order: 2, passed: false },
-        { id: `${user.id}_stop_3`, name: 'Shopping Mall', lat: location.lat + 0.003, lng: location.lng + 0.003, order: 3, passed: false },
-        { id: `${user.id}_stop_4`, name: 'University', lat: location.lat + 0.004, lng: location.lng + 0.004, order: 4, passed: false },
-        { id: `${user.id}_stop_5`, name: 'Hospital', lat: location.lat + 0.005, lng: location.lng + 0.005, order: 5, passed: false },
-      ]
+    if (isOnline && nextLocation && activeRoute) {
+      const liveBusStops = existingBusData?.busStops?.length
+        ? normalizeBusStops(activeRoute, existingBusData.busStops, true)
+        : await getDefaultRoutesForBus(activeRoute)
 
       await kv.set(`bus:${user.id}`, {
         id: user.id,
         driverName: userData?.name || 'Unknown Driver',
-        route: busName,
-        lat: location.lat,
-        lng: location.lng,
+        route: activeRoute,
+        lat: nextLocation.lat,
+        lng: nextLocation.lng,
         isOnline: true,
-        lastUpdated: new Date().toISOString(),
-        busStops: busStops
+        lastUpdated: nowIso,
+        busStops: liveBusStops,
+        tripStartTime: driverData.tripStartTime,
+        previousLocations
       })
     } else {
       await kv.del(`bus:${user.id}`)
@@ -844,6 +926,61 @@ app.get('/driver/location-shares', async (c) => {
   }
 })
 
+app.get('/notifications', async (c) => {
+  const { error: authError, user } = await authenticateRequest(c.req.raw)
+  if (authError || !user) {
+    return c.json({ error: authError || 'Authentication failed' }, 401)
+  }
+
+  try {
+    const notifications = await getActiveNotifications()
+    return c.json({ notifications })
+  } catch (error) {
+    console.log('Notifications fetch error:', error)
+    return c.json({ error: 'Failed to fetch notifications' }, 500)
+  }
+})
+
+app.post('/driver/notifications', async (c) => {
+  const { error: authError, user } = await authenticateRequest(c.req.raw)
+  if (authError || !user) {
+    return c.json({ error: authError || 'Authentication failed' }, 401)
+  }
+
+  try {
+    const { message } = await c.req.json()
+    const trimmedMessage = typeof message === 'string' ? message.trim() : ''
+
+    if (!trimmedMessage) {
+      return c.json({ error: 'Message is required' }, 400)
+    }
+
+    const activeBus = await kv.get(`bus:${user.id}`)
+    if (!activeBus?.isOnline || !activeBus?.route || activeBus?.isPassengerDriver) {
+      return c.json({ error: 'Start a driver trip to send notifications' }, 400)
+    }
+
+    const userData = await kv.get(`user:${user.id}`)
+    const createdAt = new Date().toISOString()
+    const notification = {
+      id: `notification:${user.id}:${Date.now()}`,
+      driverId: user.id,
+      driverName: userData?.name || 'Unknown Driver',
+      busName: activeBus.route,
+      message: trimmedMessage.slice(0, 400),
+      createdAt,
+      expiresAt: new Date(Date.now() + NOTIFICATION_TTL_MS).toISOString()
+    }
+
+    await kv.set(notification.id, notification)
+
+    return c.json({ success: true, notification })
+  } catch (error) {
+    console.log('Notification send error:', error)
+    return c.json({ error: 'Failed to send notification' }, 500)
+  }
+})
+
 // Update passenger location (for active sharing - passenger acting as driver)
 app.post('/passenger/update-location', async (c) => {
   const { error: authError, user } = await authenticateRequest(c.req.raw)
@@ -1027,15 +1164,18 @@ app.post('/driver/update-stops', async (c) => {
       return c.json({ error: 'Bus not found' }, 404)
     }
 
+    const normalizedLiveStops = normalizeBusStops(busData.route, busStops, true)
+    await persistRouteStops(busData.route, busStops)
+
     const updatedBusData = {
       ...busData,
-      busStops: busStops,
+      busStops: normalizedLiveStops,
       lastUpdated: new Date().toISOString()
     }
 
     await kv.set(`bus:${user.id}`, updatedBusData)
 
-    return c.json({ success: true, busStops: busStops })
+    return c.json({ success: true, busStops: normalizedLiveStops })
   } catch (error) {
     console.log('Bus stops update error:', error)
     return c.json({ error: 'Failed to update bus stops' }, 500)
@@ -1083,7 +1223,8 @@ app.post('/driver/add-route', async (c) => {
       lng: 0
     }
 
-    const updatedBusStops = [...busStops, newStop]
+    const updatedBusStops = normalizeBusStops(busData.route, [...busStops, newStop], true)
+    await persistRouteStops(busData.route, updatedBusStops)
 
     const updatedBusData = {
       ...busData,
