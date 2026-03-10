@@ -36,6 +36,7 @@ interface NotificationsCenterProps {
   busLocations: BusAlertLocation[];
   currentLocation: { lat: number; lng: number };
   locationPermissionGranted?: boolean;
+  onNotificationCountChange?: (count: number) => void;
 }
 
 const NOTIFICATION_POLL_INTERVAL_MS = 15000;
@@ -134,6 +135,7 @@ export function NotificationsCenter({
   busLocations,
   currentLocation,
   locationPermissionGranted,
+  onNotificationCountChange,
 }: NotificationsCenterProps) {
   const [notifications, setNotifications] = useState<LiveNotification[]>([]);
   const [message, setMessage] = useState('');
@@ -310,6 +312,13 @@ export function NotificationsCenter({
       ),
     [notifications]
   );
+
+  // Notify parent component when notification count changes
+  useEffect(() => {
+    if (onNotificationCountChange) {
+      onNotificationCountChange(liveNotifications.length);
+    }
+  }, [liveNotifications, onNotificationCountChange]);
 
   return (
     <div className="space-y-4">
@@ -498,20 +507,6 @@ export function NotificationsCenter({
               </div>
             ))
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Upcoming Alerts</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {futureNotifications.map((item) => (
-            <div key={item.title} className="rounded-xl border bg-muted/40 p-4">
-              <p className="font-medium">{item.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
-            </div>
-          ))}
         </CardContent>
       </Card>
     </div>

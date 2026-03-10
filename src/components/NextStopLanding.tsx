@@ -4,6 +4,8 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/dist/ScrollTrigger";
 import {
   ArrowRight,
+  Bell,
+  BellRing,
   Bot,
   Clock3,
   EyeOff,
@@ -11,6 +13,9 @@ import {
   Navigation,
   Route,
   Share2,
+  Shield,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 
 const TOTAL_FRAMES = 240;
@@ -42,6 +47,34 @@ const featureItems = [
     title: "AI Bus Route Chatbot",
     description: "Ask for routes, ETAs, and alternatives with natural language.",
     icon: Bot,
+  },
+];
+
+const upcomingAlerts = [
+  {
+    title: "Bus Stop Proximity Alert",
+    description: "Notify driver and passengers when bus is within 50 meters of the next stop.",
+    icon: BellRing,
+  },
+  {
+    title: "Passenger Overload Alert",
+    description: "Warn when onboard passenger count exceeds safe threshold.",
+    icon: Users,
+  },
+  {
+    title: "Delay Prediction",
+    description: "Show route delay risk based on traffic and previous trip timings.",
+    icon: TrendingUp,
+  },
+  {
+    title: "Driver Safety Monitoring",
+    description: "Flag harsh braking, overspeeding, or fatigue-risk driving patterns.",
+    icon: Shield,
+  },
+  {
+    title: "Emergency Broadcast",
+    description: "Send immediate alerts to admin, driver, and nearby passengers.",
+    icon: Bell,
   },
 ];
 
@@ -407,6 +440,29 @@ export default function NextStopLanding() {
                 </div>
                 <h3 className="feature-title">{feature.title}</h3>
                 <p className="feature-copy">{feature.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-container">
+          <div data-fade-up className="section-header">
+            <p className="section-kicker">Coming Soon</p>
+            <h2 className="section-title">
+              Upcoming Alerts
+            </h2>
+          </div>
+
+          <div className="feature-grid">
+            {upcomingAlerts.map((alert) => (
+              <article key={alert.title} data-fade-up className="feature-card">
+                <div className="icon-pill">
+                  <alert.icon className="icon" />
+                </div>
+                <h3 className="feature-title">{alert.title}</h3>
+                <p className="feature-copy">{alert.description}</p>
               </article>
             ))}
           </div>

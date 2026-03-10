@@ -21,6 +21,7 @@ import { MapView } from './components/MapView';
 import { AIChat } from './components/AIChat';
 import { AdminDashboard } from './components/AdminDashboard';
 import { NotificationFeature, NotificationsCenter } from './components/NotificationsCenter';
+import { HamburgerMenu } from './components/HamburgerMenu';
 
 export type UserRole = 'driver' | 'passenger' | 'admin' | null;
 
@@ -130,6 +131,8 @@ export default function MainApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [highlightBusRouteName, setHighlightBusRouteName] = useState<string | null>(null);
   const [activeDriverBusName, setActiveDriverBusName] = useState('');
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [hamburgerMenuOpen, setHamburgerMenuOpen] = useState(false);
   
   // Bus selection and available buses
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
@@ -933,10 +936,33 @@ export default function MainApp() {
         {/* Header */}
         <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <HamburgerMenu
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              notificationCount={notificationCount}
+              hasAdminAccess={hasAdminPanelAccess}
+              open={hamburgerMenuOpen}
+              onOpenChange={setHamburgerMenuOpen}
+            />
             <Bus className="h-6 w-6" />
             <span className="font-semibold">BusTracker</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              className="relative h-8 w-8 rounded-full text-primary-foreground hover:bg-primary-foreground/10 flex items-center justify-center"
+              onClick={() => setActiveTab('notifications')}
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {notificationCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1.5 flex items-center justify-center border-2 border-primary"
+                  aria-label={`${notificationCount} unread notifications`}
+                >
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </span>
+              )}
+            </button>
             <Badge variant="secondary" className="flex items-center gap-1">
               <Coins className="h-3 w-3" />
               {user.coins || 0}
@@ -950,19 +976,11 @@ export default function MainApp() {
             <Badge variant={user.role === 'admin' ? 'destructive' : (isOnline && user.role === 'driver' ? 'default' : 'secondary')}>
               {user.role === 'admin' ? 'Admin' : (user.role === 'driver' ? (isOnline ? 'Online' : 'Offline') : 'Passenger')}
             </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-              onClick={() => setActiveTab('notifications')}
-            >
-              <Bell className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="pb-32 sm:pb-6">
+        <div className="pb-6">
           {activeTab === 'home' && (
             <div className="p-4">
               {user.role === 'admin' ? (
@@ -1009,6 +1027,7 @@ export default function MainApp() {
                 busLocations={busLocations}
                 currentLocation={currentLocation}
                 locationPermissionGranted={locationPermissionGranted}
+                onNotificationCountChange={setNotificationCount}
               />
             </div>
           )}
@@ -1141,56 +1160,6 @@ export default function MainApp() {
 
         {/* AI Chat Component */}
         <AIChat onMapLinkClick={handleChatMapLinkClick} />
-
-        {/* Bottom Navigation - Always visible */}
-        <div className="fixed inset-x-0 bottom-0 z-30">
-          <div className="mx-auto max-w-md border-t bg-white shadow-lg">
-            <div className={`grid gap-2 p-4 ${hasAdminPanelAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
-            <Button 
-              variant={activeTab === 'home' ? 'default' : 'ghost'} 
-              className="flex h-auto flex-col items-center gap-1 py-2"
-              onClick={() => setActiveTab('home')}
-            >
-              <MapPin className="h-4 w-4" />
-              <span className="text-xs">Home</span>
-            </Button>
-            <Button 
-              variant={activeTab === 'map' ? 'default' : 'ghost'} 
-              className="flex h-auto flex-col items-center gap-1 py-2"
-              onClick={() => setActiveTab('map')}
-            >
-              <Bus className="h-4 w-4" />
-              <span className="text-xs">Map</span>
-            </Button>
-            <Button
-              variant={activeTab === 'notifications' ? 'default' : 'ghost'}
-              className="flex h-auto flex-col items-center gap-1 py-2"
-              onClick={() => setActiveTab('notifications')}
-            >
-              <Bell className="h-4 w-4" />
-              <span className="text-xs">Alerts</span>
-            </Button>
-            {hasAdminPanelAccess && (
-              <Button 
-                variant={activeTab === 'admin' ? 'default' : 'ghost'} 
-                className="flex h-auto flex-col items-center gap-1 py-2"
-                onClick={() => setActiveTab('admin')}
-              >
-                <Shield className="h-4 w-4" />
-                <span className="text-xs">Admin</span>
-              </Button>
-            )}
-            <Button 
-              variant={activeTab === 'profile' ? 'default' : 'ghost'} 
-              className="flex h-auto flex-col items-center gap-1 py-2"
-              onClick={() => setActiveTab('profile')}
-            >
-              <Settings className="h-4 w-4" />
-              <span className="text-xs">Profile</span>
-            </Button>
-          </div>
-        </div>
-        </div>
       </div>
     </div>
   );
