@@ -38,6 +38,16 @@ export interface LiveNotification {
   expiresAt: string;
 }
 
+export interface AdminStats {
+  total: number;
+  drivers: number;
+  passengers: number;
+  admins: number;
+  onlineUsers: number;
+  activeDrivers: number;
+  activePassengers: number;
+}
+
 class ApiClient {
   private accessToken: string | null = null;
   private validKitKey = "vk_prod_931cac0aba91c7202eea55da";
@@ -270,6 +280,13 @@ class ApiClient {
   // Admin functions
   async getAllUsers() {
     return this.request('/admin/users');
+  }
+
+  async stopUserSharing(userId: string) {
+    return this.request('/admin/stop-user-sharing', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
   }
 }
 

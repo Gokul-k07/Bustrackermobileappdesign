@@ -18,12 +18,15 @@ const ALLOWED_ORIGIN_PATTERNS = [
 
 const CORS_ALLOW_HEADERS = 'Authorization, Content-Type, apikey, x-client-info'
 const CORS_ALLOW_METHODS = 'GET, POST, PUT, DELETE, OPTIONS'
+const ADMIN_ACCESS_EMAIL = 'gokulk24cb@psnacet.edu.in'
 
 const isAllowedOrigin = (origin: string | undefined) => {
   if (!origin) return false
   if (ALLOWED_ORIGINS.has(origin)) return true
   return ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin))
 }
+
+const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase()
 
 // Middleware
 app.use('*', async (c, next) => {
@@ -1407,27 +1410,165 @@ app.get('/admin/users', async (c) => {
     }
 
     // Check if user has admin role
-    if (userData.role !== 'admin') {
+    const hasAdminAccess =
+      userData.role === 'admin' ||
+      normalizeEmail(userData.email || user.email) === ADMIN_ACCESS_EMAIL
+
+    if (!hasAdminAccess) {
       return c.json({ error: 'Unauthorized. Admin access required.' }, 403)
     }
 
     // Get all users from KV store
-    const allUsers = await kv.getByPrefix('user:')
+    const [allUsers, allBuses, allShares] = await Promise.all([
+      kv.getByPrefix('user:'),
+      kv.getByPrefix('bus:'),
+      kv.getByPrefix('share:')
+    ])
+
+    const activeBuses = allBuses.filter((bus) => bus.isOnline)
+    const activeShares = allShares.filter((share) => share.active)
+
+    const augmentedUsers = allUsers.map((storedUser) => {
+      const liveBus = activeBuses.find((bus) => bus.id === storedUser.id)
+      const userShares = activeShares.filter((share) => share.userId === storedUser.id)
+      const sharingMode = liveBus?.isOnline
+        ? (liveBus.isPassengerDriver ? 'passenger-sharing' : 'driver-trip')
+        : userShares.length > 0
+          ? 'passenger-sharing'
+          : 'offline'
+
+      return {
+        ...storedUser,
+        isOnline: sharingMode !== 'offline',
+        sharingMode,
+        liveBusName: liveBus?.route || userShares[0]?.busName || null,
+        activeShareCount: userShares.length,
+        sharingStartedAt: liveBus?.tripStartTime || userShares[0]?.startTime || null
+      }
+    })
+
     // Sort by creation date (newest first)
-    const sortedUsers = allUsers.sort((a, b) => {
+    const sortedUsers = augmentedUsers.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime()
       const dateB = new Date(b.createdAt || 0).getTime()
       return dateB - dateA
     })
 
+    const stats = {
+      total: sortedUsers.length,
+      drivers: sortedUsers.filter((entry) => entry.role === 'driver').length,
+      passengers: sortedUsers.filter((entry) => entry.role === 'passenger').length,
+      admins: sortedUsers.filter((entry) => entry.role === 'admin').length,
+      onlineUsers: sortedUsers.filter((entry) => entry.isOnline).length,
+      activeDrivers: sortedUsers.filter((entry) => entry.sharingMode === 'driver-trip').length,
+      activePassengers: sortedUsers.filter((entry) => entry.sharingMode === 'passenger-sharing').length
+    }
+
     return c.json({ 
       success: true, 
       users: sortedUsers,
+      stats,
       totalCount: sortedUsers.length 
     })
   } catch (error) {
     console.log('Admin users fetch error:', error)
     return c.json({ error: 'Failed to fetch users' }, 500)
+  }
+})
+
+app.post('/admin/stop-user-sharing', async (c) => {
+  const { error: authError, user } = await authenticateRequest(c.req.raw)
+  if (authError || !user) {
+    return c.json({ error: authError || 'Authentication failed' }, 401)
+  }
+
+  try {
+    const adminUserData = await kv.get(`user:${user.id}`)
+    if (!adminUserData) {
+      return c.json({ error: 'User not found' }, 404)
+    }
+
+    const hasAdminAccess =
+      adminUserData.role === 'admin' ||
+      normalizeEmail(adminUserData.email || user.email) === ADMIN_ACCESS_EMAIL
+
+    if (!hasAdminAccess) {
+      return c.json({ error: 'Unauthorized. Admin access required.' }, 403)
+    }
+
+    const { userId } = await c.req.json()
+    if (!userId) {
+      return c.json({ error: 'Target userId is required' }, 400)
+    }
+
+    let targetUserData = await kv.get(`user:${userId}`)
+    if (!targetUserData) {
+      return c.json({ error: 'Target user not found' }, 404)
+    }
+
+    const nowIso = new Date().toISOString()
+    const targetBus = await kv.get(`bus:${userId}`)
+    const targetDriverData = await kv.get(`driver:${userId}`)
+    const targetShares = (await kv.getByPrefix(`share:${userId}:`)).filter((share) => share.active)
+
+    const isDriverTripActive = Boolean(targetBus?.isOnline && !targetBus?.isPassengerDriver) || Boolean(targetDriverData?.isOnline)
+    const isPassengerSharingActive = Boolean(targetBus?.isOnline && targetBus?.isPassengerDriver) || targetShares.length > 0
+
+    if (!isDriverTripActive && !isPassengerSharingActive) {
+      return c.json({ error: 'User has no active sharing session' }, 400)
+    }
+
+    let stoppedDriverTrip = false
+    let stoppedPassengerShares = 0
+
+    if (isDriverTripActive) {
+      const nextDriverState = {
+        ...(targetDriverData || {}),
+        isOnline: false,
+        route: targetDriverData?.route || targetBus?.route || '',
+        currentLocation: null,
+        lastUpdated: nowIso,
+        tripStartTime: null,
+        previousLocations: targetDriverData?.previousLocations || targetBus?.previousLocations || []
+      }
+      await kv.set(`driver:${userId}`, nextDriverState)
+      stoppedDriverTrip = true
+
+      const tripHistory = Array.isArray(targetUserData.tripHistory) ? [...targetUserData.tripHistory] : []
+      if (tripHistory.length > 0) {
+        const lastTrip = tripHistory[tripHistory.length - 1]
+        if (lastTrip && !lastTrip.endTime) {
+          lastTrip.endTime = nowIso
+          targetUserData = { ...targetUserData, tripHistory }
+          await kv.set(`user:${userId}`, targetUserData)
+        }
+      }
+    }
+
+    if (targetBus?.isOnline) {
+      await kv.del(`bus:${userId}`)
+    }
+
+    if (targetShares.length > 0) {
+      for (const share of targetShares) {
+        await kv.set(share.id, {
+          ...share,
+          active: false,
+          stoppedByAdminId: user.id,
+          stoppedAt: nowIso
+        })
+      }
+      stoppedPassengerShares = targetShares.length
+    }
+
+    return c.json({
+      success: true,
+      stoppedDriverTrip,
+      stoppedPassengerShares
+    })
+  } catch (error) {
+    console.log('Admin stop sharing error:', error)
+    return c.json({ error: 'Failed to stop user sharing' }, 500)
   }
 })
 

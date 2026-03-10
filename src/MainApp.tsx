@@ -927,8 +927,6 @@ export default function MainApp() {
     ? busLocations.find((bus) => bus.id === user.id && bus.isOnline) || null
     : null;
   const currentDriverBusName = liveDriverBus?.route || activeDriverBusName;
-  const bottomNavColumns = hasAdminPanelAccess ? 'grid-cols-5' : 'grid-cols-4';
-
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto bg-white min-h-screen relative">
@@ -964,7 +962,7 @@ export default function MainApp() {
         </div>
 
         {/* Main Content */}
-        <div className="pb-32">
+        <div className="pb-32 sm:pb-6">
           {activeTab === 'home' && (
             <div className="p-4">
               {user.role === 'admin' ? (
@@ -1008,6 +1006,9 @@ export default function MainApp() {
                 canBroadcast={user.role === 'driver' && isOnline && Boolean(currentDriverBusName)}
                 activeBusName={currentDriverBusName}
                 futureNotifications={FUTURE_NOTIFICATIONS}
+                busLocations={busLocations}
+                currentLocation={currentLocation}
+                locationPermissionGranted={locationPermissionGranted}
               />
             </div>
           )}
@@ -1142,11 +1143,12 @@ export default function MainApp() {
         <AIChat onMapLinkClick={handleChatMapLinkClick} />
 
         {/* Bottom Navigation - Always visible */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-30 shadow-lg">
-          <div className={`grid ${bottomNavColumns} gap-2 p-4`}>
+        <div className="fixed inset-x-0 bottom-0 z-30">
+          <div className="mx-auto max-w-md border-t bg-white shadow-lg">
+            <div className={`grid gap-2 p-4 ${hasAdminPanelAccess ? 'grid-cols-5' : 'grid-cols-4'}`}>
             <Button 
               variant={activeTab === 'home' ? 'default' : 'ghost'} 
-              className="flex flex-col items-center gap-1 h-auto py-2"
+              className="flex h-auto flex-col items-center gap-1 py-2"
               onClick={() => setActiveTab('home')}
             >
               <MapPin className="h-4 w-4" />
@@ -1154,7 +1156,7 @@ export default function MainApp() {
             </Button>
             <Button 
               variant={activeTab === 'map' ? 'default' : 'ghost'} 
-              className="flex flex-col items-center gap-1 h-auto py-2"
+              className="flex h-auto flex-col items-center gap-1 py-2"
               onClick={() => setActiveTab('map')}
             >
               <Bus className="h-4 w-4" />
@@ -1162,7 +1164,7 @@ export default function MainApp() {
             </Button>
             <Button
               variant={activeTab === 'notifications' ? 'default' : 'ghost'}
-              className="flex flex-col items-center gap-1 h-auto py-2"
+              className="flex h-auto flex-col items-center gap-1 py-2"
               onClick={() => setActiveTab('notifications')}
             >
               <Bell className="h-4 w-4" />
@@ -1171,7 +1173,7 @@ export default function MainApp() {
             {hasAdminPanelAccess && (
               <Button 
                 variant={activeTab === 'admin' ? 'default' : 'ghost'} 
-                className="flex flex-col items-center gap-1 h-auto py-2"
+                className="flex h-auto flex-col items-center gap-1 py-2"
                 onClick={() => setActiveTab('admin')}
               >
                 <Shield className="h-4 w-4" />
@@ -1180,13 +1182,14 @@ export default function MainApp() {
             )}
             <Button 
               variant={activeTab === 'profile' ? 'default' : 'ghost'} 
-              className="flex flex-col items-center gap-1 h-auto py-2"
+              className="flex h-auto flex-col items-center gap-1 py-2"
               onClick={() => setActiveTab('profile')}
             >
               <Settings className="h-4 w-4" />
               <span className="text-xs">Profile</span>
             </Button>
           </div>
+        </div>
         </div>
       </div>
     </div>
