@@ -133,6 +133,7 @@ export default function MainApp() {
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
   const [selectedBusForSharing, setSelectedBusForSharing] = useState('');
   const [tripHistory, setTripHistory] = useState<any[]>([]);
+  const [activeDriverBusName, setActiveDriverBusName] = useState('');
 
   // Feedback state
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
@@ -224,6 +225,8 @@ export default function MainApp() {
       setAvailableBuses(availableBusesData?.buses || []);
 
       if (effectiveRole === 'driver') {
+        const activeBus = onlineBuses.find((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline);
+        setActiveDriverBusName(activeBus?.route || '');
         const [otpsData, sharesData] = await Promise.all([
           apiClient.getDriverOTPs().catch(() => ({ otps: [] })),
           apiClient.getLocationShares().catch(() => ({ shares: [] }))
@@ -231,11 +234,11 @@ export default function MainApp() {
 
         if (initRunId !== initRunIdRef.current) return;
 
-        setOtps(otpsData.otps || []);
-        setLocationShares(sharesData.shares || []);
-        setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
-        setIsLocationSharing(false);
-      } else if (effectiveRole === 'passenger') {
+          setOtps(otpsData.otps || []);
+          setLocationShares(sharesData.shares || []);
+          setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === mergedUser.id && bus.isOnline));
+          setIsLocationSharing(false);
+        } else if (effectiveRole === 'passenger') {
         setOtps([]);
         setLocationShares([]);
         setIsOnline(false);
@@ -458,13 +461,15 @@ export default function MainApp() {
               apiClient.getLocationShares().catch(() => ({ shares: [] }))
             ]);
 
-            setOtps(otpsData.otps || []);
-            setLocationShares(sharesData.shares || []);
-            setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
-          } else if (user.role === 'passenger') {
-            setOtps([]);
-            setLocationShares([]);
-            setIsOnline(false);
+          setOtps(otpsData.otps || []);
+          setLocationShares(sharesData.shares || []);
+          const activeBus = onlineBuses.find((bus: BusLocation) => bus.id === user.id && bus.isOnline);
+          setActiveDriverBusName(activeBus?.route || '');
+          setIsOnline(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
+        } else if (user.role === 'passenger') {
+          setOtps([]);
+          setLocationShares([]);
+          setIsOnline(false);
             setIsLocationSharing(onlineBuses.some((bus: BusLocation) => bus.id === user.id && bus.isOnline));
           } else {
             setOtps([]);
@@ -537,7 +542,8 @@ export default function MainApp() {
                     localStorage.removeItem('bustracker_sharing_state');
                   }
                 } else if (user.role === 'driver' && isOnline) {
-                  await apiClient.updateDriverStatus(true, newLocation);
+                  const busName = activeDriverBusName || undefined;
+                  await apiClient.updateDriverStatus(true, newLocation, busName, busName);
                 }
               } catch (error: any) {
                 if (error.message?.includes('expired')) {
@@ -565,7 +571,8 @@ export default function MainApp() {
               await apiClient.updateLocation(currentLocation);
             } else if (user.role === 'driver' && isOnline) {
               // Update driver's bus location
-              await apiClient.updateDriverStatus(true, currentLocation);
+              const busName = activeDriverBusName || undefined;
+              await apiClient.updateDriverStatus(true, currentLocation, busName, busName);
             }
           } catch (error) {
             console.error('Failed to update location:', error);
@@ -774,21 +781,27 @@ export default function MainApp() {
   const toggleDriverOnline = async (busName?: string) => {
     try {
       const newOnlineStatus = !isOnline;
+      const resolvedBusName = newOnlineStatus ? (busName || activeDriverBusName) : activeDriverBusName;
       
       await apiClient.updateDriverStatus(
         newOnlineStatus,
         newOnlineStatus ? currentLocation : undefined,
-        busName,
-        busName
+        resolvedBusName,
+        resolvedBusName
       );
       
       setIsOnline(newOnlineStatus);
       
       if (newOnlineStatus) {
+        if (busName) {
+          setActiveDriverBusName(busName);
+        }
         toast.success('You are now online', {
-          description: `Your bus "${busName}" is now sharing location with passengers`
+          description: `Your bus "${resolvedBusName || 'Unknown'}" is now sharing location with passengers`
         });
       } else {
+        setActiveDriverBusName('');
+        await loadBusLocations();
         toast.info('You are now offline', {
           description: 'Location sharing has stopped'
         });
