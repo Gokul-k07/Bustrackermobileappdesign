@@ -301,7 +301,7 @@ export function MapView({
         worldCopyJump: true,
         maxBounds: null,
         maxBoundsViscosity: 0.0,
-        zoomControl: false
+        zoomControl: false,
       }).setView([currentLocation.lat, currentLocation.lng], 13);
 
       // Add light MapTiler tile layer (white/light theme)
@@ -336,6 +336,18 @@ export function MapView({
       new centerControl({ position: 'topright' }).addTo(mapInstance.current);
     }
   }, [mapLoaded, currentLocation]);
+
+  useEffect(() => {
+    if (!mapLoaded || !mapInstance.current || typeof window === 'undefined') return;
+    const map = mapInstance.current;
+    const handleResize = () => map.invalidateSize();
+    const resizeTimer = window.setTimeout(() => map.invalidateSize(), 0);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.clearTimeout(resizeTimer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [mapLoaded]);
 
   // Update markers when locations change
   useEffect(() => {
@@ -970,8 +982,8 @@ export function MapView({
         <CardContent className="p-0 relative">
           <div 
             ref={mapRef} 
-            className="w-full h-96 bg-gray-900 rounded-lg overflow-hidden relative"
-            style={{ minHeight: '500px', zIndex: 1 }}
+            className="w-full h-[320px] sm:h-[420px] bg-gray-900 rounded-lg overflow-hidden relative z-0"
+            style={{ minHeight: '500px' }}
           />
           
           {!mapLoaded && (
@@ -983,10 +995,8 @@ export function MapView({
             </div>
           )}
 
-          {/* Map Attribution */}
-          <div className="absolute bottom-1 right-1 bg-black/70 px-2 py-1 rounded text-xs text-white/70 z-[400] pointer-events-none">
-            © MapTiler
-          </div>
+          {/* Map attribution handled by Leaflet control */}
+        
         </CardContent>
       </Card>
 

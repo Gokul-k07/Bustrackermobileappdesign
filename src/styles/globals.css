@@ -187,3 +187,28 @@
 html {
   font-size: var(--font-size);
 }
+
+.NavigationMenu{
+  position: fixed;
+  z-index: 1000;
+}
+
+.leaflet-container {
+  z-index: 0 !important;
+}
+
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control-container {
+  z-index: 1 !important;
+}
+
+body.sidebar-open .leaflet-container,
+body.sidebar-open .leaflet-pane,
+body.sidebar-open .leaflet-top,
+body.sidebar-open .leaflet-bottom,
+body.sidebar-open .leaflet-control-container {
+  pointer-events: none;
+}
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Bus, Coins, Settings, MessageSquare, Send, Loader2, Bell, Shield } from 'lucide-react';
+import { MapPin, Bus, Coins, Settings, MessageSquare, Send, Loader2, Bell, Shield, Menu } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
@@ -21,7 +21,7 @@ import { MapView } from './components/MapView';
 import { AIChat } from './components/AIChat';
 import { AdminDashboard } from './components/AdminDashboard';
 import { NotificationFeature, NotificationsCenter } from './components/NotificationsCenter';
-import { HamburgerMenu } from './components/HamburgerMenu';
+import { SidebarNav } from './components/SidebarNav';
 
 export type UserRole = 'driver' | 'passenger' | 'admin' | null;
 
@@ -132,7 +132,7 @@ export default function MainApp() {
   const [highlightBusRouteName, setHighlightBusRouteName] = useState<string | null>(null);
   const [activeDriverBusName, setActiveDriverBusName] = useState('');
   const [notificationCount, setNotificationCount] = useState(0);
-  const [hamburgerMenuOpen, setHamburgerMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Bus selection and available buses
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
@@ -354,6 +354,18 @@ export default function MainApp() {
       saveAppState();
     }
   }, [activeTab, user?.id]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const className = 'sidebar-open';
+    if (sidebarOpen) {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+    return () => document.body.classList.remove(className);
+  }, [sidebarOpen]);
+
 
   // Keep map-link URL state in sync on browser navigation.
   useEffect(() => {
@@ -930,23 +942,50 @@ export default function MainApp() {
     ? busLocations.find((bus) => bus.id === user.id && bus.isOnline) || null
     : null;
   const currentDriverBusName = liveDriverBus?.route || activeDriverBusName;
+  const isHomeActive = activeTab === 'home';
+  const activeTabLabelMap: Record<string, string> = {
+    home: 'Home',
+    map: 'Map',
+    notifications: 'Alerts',
+    profile: 'Profile',
+    admin: 'Admin',
+  };
+  const activeTabLabel = activeTabLabelMap[activeTab] || 'BusTracker';
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-md mx-auto bg-white min-h-screen relative">
-        {/* Header */}
-        <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HamburgerMenu
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              notificationCount={notificationCount}
-              hasAdminAccess={hasAdminPanelAccess}
-              open={hamburgerMenuOpen}
-              onOpenChange={setHamburgerMenuOpen}
-            />
-            <Bus className="h-6 w-6" />
-            <span className="font-semibold">BusTracker</span>
-          </div>
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <SidebarNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        notificationCount={notificationCount}
+        hasAdminAccess={hasAdminPanelAccess}
+        isOpen={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+      />
+      <div>
+        <div
+          className={[
+            'max-w-md mx-auto min-h-screen relative transition-opacity duration-300 ease-in-out',
+            isHomeActive ? 'bg-black text-white' : 'bg-white text-slate-900',
+            sidebarOpen ? 'opacity-40 pointer-events-none' : 'opacity-100'
+          ].join(' ')}
+          inert={sidebarOpen ? '' : undefined}
+        >
+          {/* Header */}
+          <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between relative z-[1000]">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
+                aria-label="Open navigation menu"
+                onClick={() => setSidebarOpen((prev) => !prev)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <Bus className="h-6 w-6" />
+              <span className="font-semibold">{activeTabLabel}</span>
+            </div>
           <div className="flex items-center gap-2">
             <button
               className="relative h-8 w-8 rounded-full text-primary-foreground hover:bg-primary-foreground/10 flex items-center justify-center"
@@ -979,8 +1018,8 @@ export default function MainApp() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="pb-6">
+          {/* Main Content */}
+          <div className="pb-6">
           {activeTab === 'home' && (
             <div className="p-4">
               {user.role === 'admin' ? (
@@ -1158,8 +1197,9 @@ export default function MainApp() {
           )}
         </div>
 
-        {/* AI Chat Component */}
-        <AIChat onMapLinkClick={handleChatMapLinkClick} />
+          {/* AI Chat Component */}
+          <AIChat onMapLinkClick={handleChatMapLinkClick} />
+        </div>
       </div>
     </div>
   );

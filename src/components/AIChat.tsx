@@ -97,7 +97,7 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-20 right-4 z-40">
+      <div className="fixed bottom-20 right-4 z-[900]">
         <Button
           onClick={() => setIsOpen(true)}
           size="lg"
@@ -110,7 +110,7 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-40 w-80 md:w-96">
+    <div className="fixed bottom-20 right-4 z-[900] w-80 md:w-96">
       <Card className="shadow-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
           <CardTitle className="flex items-center gap-2">
