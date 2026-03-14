@@ -133,7 +133,8 @@ export default function MainApp() {
   const [activeDriverBusName, setActiveDriverBusName] = useState('');
   const [notificationCount, setNotificationCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+  const [chatOpen, setChatOpen] = useState(false);
+
   // Bus selection and available buses
   const [availableBuses, setAvailableBuses] = useState<string[]>([]);
   const [selectedBusForSharing, setSelectedBusForSharing] = useState('');
@@ -1082,6 +1083,7 @@ export default function MainApp() {
                 isLocationSharing={isLocationSharing}
                 locationPermissionGranted={locationPermissionGranted}
                 highlightBusRouteName={highlightBusRouteName}
+                overlayOpen={sidebarOpen || chatOpen}
               />
             </div>
           )}
@@ -1198,7 +1200,7 @@ export default function MainApp() {
         </div>
 
           {/* AI Chat Component */}
-          <AIChat onMapLinkClick={handleChatMapLinkClick} />
+          <AIChat onMapLinkClick={handleChatMapLinkClick} onOpenChange={setChatOpen} />
         </div>
       </div>
     </div>

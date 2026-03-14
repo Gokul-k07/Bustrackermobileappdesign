@@ -118,7 +118,7 @@ export function SidebarNav({
   return createPortal(
     <div
       className={[
-        'fixed inset-0 z-[1000] flex',
+        'fixed inset-0 z-[1100] flex',
         animateIn ? 'pointer-events-auto' : 'pointer-events-none'
       ].join(' ')}
       role="dialog"
@@ -135,7 +135,7 @@ export function SidebarNav({
       />
       <aside
         className={[
-          'relative z-[1001] h-full w-[240px] bg-white text-slate-900 shadow-2xl',
+          'relative z-[1101] h-full w-[240px] bg-white text-slate-900 shadow-2xl',
           'transform transition-transform duration-300 ease-in-out',
           animateIn ? 'translate-x-0' : '-translate-x-full'
         ].join(' ')}

@@ -433,13 +433,20 @@ export function NotificationsCenter({
             </div>
           )}
 
-          {activeBuses.length === 0 ? (
+          {activeBuses.filter((bus) => !watchedRoutes.includes(bus.route)).length === 0 &&
+          watchedBusSummaries.length > 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              All selected buses are listed above. Add more from the list when they become available.
+            </div>
+          ) : activeBuses.filter((bus) => !watchedRoutes.includes(bus.route)).length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               No buses are live right now.
             </div>
           ) : (
             <div className="space-y-2">
-              {activeBuses.map((bus) => {
+              {activeBuses
+                .filter((bus) => !watchedRoutes.includes(bus.route))
+                .map((bus) => {
                 const isWatching = watchedRoutes.includes(bus.route);
                 const { etaMinutes, distanceKm } = estimateMinutesToLocation(bus, currentLocation);
 

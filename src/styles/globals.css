@@ -204,11 +204,34 @@ html {
   z-index: 1 !important;
 }
 
+/* Keep map behind sidebar and AI chatbot when either overlay is open */
+/* Leaflet uses z-index 800–1000 by default; overlay z-index is 1050–1100 */
 body.sidebar-open .leaflet-container,
+body.chat-open .leaflet-container {
+  position: relative !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+body.sidebar-open .leaflet-container *,
+body.chat-open .leaflet-container * {
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* Override Leaflet's default pane/control z-index (200–1000) when overlay open */
 body.sidebar-open .leaflet-pane,
 body.sidebar-open .leaflet-top,
 body.sidebar-open .leaflet-bottom,
-body.sidebar-open .leaflet-control-container {
-  pointer-events: none;
+body.sidebar-open .leaflet-control-container,
+body.sidebar-open .leaflet-control,
+body.sidebar-open .leaflet-routing-container,
+body.chat-open .leaflet-pane,
+body.chat-open .leaflet-top,
+body.chat-open .leaflet-bottom,
+body.chat-open .leaflet-control-container,
+body.chat-open .leaflet-control,
+body.chat-open .leaflet-routing-container {
+  pointer-events: none !important;
+  z-index: 1 !important;
 }
 

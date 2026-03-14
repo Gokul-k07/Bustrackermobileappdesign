@@ -16,9 +16,10 @@ interface Message {
 
 interface AIChatProps {
   onMapLinkClick?: (mapLink: string) => void;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function AIChat({ onMapLinkClick }: AIChatProps) {
+export function AIChat({ onMapLinkClick, onOpenChange }: AIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -37,6 +38,23 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  // Sync body class so map/overlays stay behind when chat is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const className = 'chat-open';
+    if (isOpen) {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+    return () => document.body.classList.remove(className);
+  }, [isOpen]);
+
+  const setOpen = (open: boolean) => {
+    setIsOpen(open);
+    onOpenChange?.(open);
+  };
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -97,9 +115,9 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-20 right-4 z-[900]">
+      <div className="fixed bottom-20 right-4 z-[1050]">
         <Button
-          onClick={() => setIsOpen(true)}
+          onClick={() => setOpen(true)}
           size="lg"
           className="rounded-full h-14 w-14 shadow-lg"
         >
@@ -110,7 +128,7 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-[900] w-80 md:w-96">
+    <div className="fixed bottom-20 right-4 z-[1050] w-80 md:w-96">
       <Card className="shadow-2xl">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
           <CardTitle className="flex items-center gap-2">
@@ -120,7 +138,7 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsOpen(false)}
+            onClick={() => setOpen(false)}
             className="h-6 w-6 p-0 text-white hover:bg-white/20"
           >
             <X className="h-4 w-4" />
@@ -146,8 +164,8 @@ export function AIChat({ onMapLinkClick }: AIChatProps) {
                     <p className="text-sm whitespace-pre-line">{message.text}</p>
                     {message.sender === 'bot' && message.mapLink && (
                       <Button
-                        variant="link"
-                        className="h-auto px-0 py-0 mt-1 text-xs"
+                        className="mt-1 text-xs text-white border-0 shadow-[0px_4px_12px_0px_rgba(0,0,0,0.15)] hover:opacity-90 no-underline rounded-md px-3 py-1.5"
+                        style={{ background: 'linear-gradient(90deg, #6e6cfe 0%, #ae00ff 100%)', color: 'white' }}
                         onClick={() => handleMapLink(message.mapLink as string)}
                       >
                         View Route on Map

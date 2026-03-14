@@ -19,6 +19,7 @@ interface MapViewProps {
   isLocationSharing?: boolean;
   locationPermissionGranted?: boolean;
   highlightBusRouteName?: string | null;
+  overlayOpen?: boolean;
 }
 
 declare global {
@@ -35,7 +36,8 @@ export function MapView({
   userId,
   isLocationSharing,
   locationPermissionGranted,
-  highlightBusRouteName
+  highlightBusRouteName,
+  overlayOpen = false,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -55,8 +57,11 @@ export function MapView({
   const [newRouteName, setNewRouteName] = useState('');
   const [isAddingRoute, setIsAddingRoute] = useState(false);
   const [busSearchQuery, setBusSearchQuery] = useState('');
+  const [placeName, setPlaceName] = useState<string | null>(null);
   const ROUTE_REFRESH_INTERVAL_MS = 3000;
-  
+
+  const showUserLocationIndicator = Boolean(locationPermissionGranted && !isLocationSharing);
+
   const onlineBuses = busLocations.filter(bus => bus.isOnline);
 
   const normalizeBusRouteName = (value: string | null | undefined) => (value || '').trim().toUpperCase();
@@ -74,6 +79,39 @@ export function MapView({
 
   const isValidCoordinate = (lat: number, lng: number) =>
     Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+
+  // Reverse geocode coordinates to place name
+  useEffect(() => {
+    if (!locationPermissionGranted || !isValidCoordinate(currentLocation.lat, currentLocation.lng)) {
+      setPlaceName(null);
+      return;
+    }
+    const controller = new AbortController();
+    const fetchPlace = async () => {
+      try {
+        const { lat, lng } = currentLocation;
+        const res = await fetch(
+          `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=3rn9Pt2DDS2PIVE5bwGb`,
+          { signal: controller.signal }
+        );
+        const data = await res.json();
+        const features = data?.features || [];
+        const locality = features.find((f: any) =>
+          ['county', 'place', 'locality', 'city', 'village', 'neighborhood'].some(
+            (t) => f?.place_type?.includes?.(t)
+          )
+        );
+        const road = features.find((f: any) => f?.place_type?.includes?.('road'));
+        const fallback = features[0];
+        const name = locality?.text || road?.text || fallback?.text || null;
+        setPlaceName(name);
+      } catch {
+        setPlaceName(null);
+      }
+    };
+    fetchPlace();
+    return () => controller.abort();
+  }, [currentLocation.lat, currentLocation.lng, locationPermissionGranted]);
 
   // Helper function to calculate distance between two points
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -302,12 +340,12 @@ export function MapView({
         maxBounds: null,
         maxBoundsViscosity: 0.0,
         zoomControl: false,
+        attributionControl: false,
       }).setView([currentLocation.lat, currentLocation.lng], 13);
 
       // Add light MapTiler tile layer (white/light theme)
       const API_KEY = "3rn9Pt2DDS2PIVE5bwGb";
       L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${API_KEY}`, {
-        attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">© MapTiler</a>',
         maxZoom: 18,
         noWrap: false,
       }).addTo(mapInstance.current);
@@ -366,9 +404,28 @@ export function MapView({
     const routeLayer = markersRef.current['routeLayer'];
     markersRef.current = routeLayer ? { routeLayer } : {};
 
-    // Note: Passenger location sharing is handled by showing them in the bus list
-    // They will appear as a regular bus marker with their chosen bus name
-    // No need to add a separate user location marker
+    // Add user location marker only when location is on and NOT sharing
+    if (showUserLocationIndicator && isValidCoordinate(currentLocation.lat, currentLocation.lng)) {
+      const userIcon = L.divIcon({
+        html: `
+          <div style="
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(34, 197, 94, 0.6);
+          "></div>
+        `,
+        className: 'custom-marker user-location',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+      const userMarker = L.marker([currentLocation.lat, currentLocation.lng], { icon: userIcon })
+        .addTo(mapInstance.current)
+        .bindPopup('<div style="color: #1f2937; font-family: sans-serif;"><b>Your Location</b></div>');
+      markersRef.current['user-location'] = userMarker;
+    }
 
     // Add bus markers with PURPLE/MAGENTA color
     onlineBuses.forEach((bus) => {
@@ -433,7 +490,7 @@ export function MapView({
       });
     }
 
-  }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted]);
+  }, [mapLoaded, currentLocation, onlineBuses, locationShares, userRole, isLocationSharing, locationPermissionGranted, showUserLocationIndicator]);
 
   const loadBusStopsForBus = async (bus: BusLocation): Promise<BusStop[]> => {
     try {
@@ -979,12 +1036,30 @@ export function MapView({
 
       {/* Interactive Map Container */}
       <Card className="overflow-hidden">
-        <CardContent className="p-0 relative">
-          <div 
-            ref={mapRef} 
-            className="w-full h-[320px] sm:h-[420px] bg-gray-900 rounded-lg overflow-hidden relative z-0"
-            style={{ minHeight: '500px' }}
-          />
+        <CardContent className="p-0 relative h-[500px] overflow-hidden [&:last-child]:pb-0">
+          <div
+            className="relative w-full"
+            style={
+              overlayOpen
+                ? {
+                    zIndex: 0,
+                    isolation: 'isolate' as const,
+                    pointerEvents: 'none' as const,
+                  }
+                : undefined
+            }
+          >
+            <div
+              ref={mapRef}
+              className="w-full h-[320px] sm:h-[420px] bg-gray-900 rounded-lg overflow-hidden relative z-0"
+              style={{
+                minHeight: '500px',
+                ...(overlayOpen
+                  ? { zIndex: 0, pointerEvents: 'none' as const }
+                  : {}),
+              }}
+            />
+          </div>
           
           {!mapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
@@ -1272,7 +1347,9 @@ export function MapView({
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm ring-2 ring-green-100 ring-offset-0 animate-pulse"></div>
-                  <div className="absolute -inset-1 bg-green-400 rounded-full opacity-20 animate-ping"></div>
+                  {showUserLocationIndicator && (
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-green-400 rounded-full opacity-20 animate-ping"></div>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -1291,7 +1368,7 @@ export function MapView({
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <span className="text-xs font-mono text-green-700 bg-white/60 px-2 py-0.5 rounded border border-green-100 block">
-                    {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                    {placeName || (locationPermissionGranted ? 'Online' : 'Offline')}
                   </span>
                   <p className="text-[9px] text-green-500/70 mt-0.5">Swipe down to refresh</p>
                 </div>
